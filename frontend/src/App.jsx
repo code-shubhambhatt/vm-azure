@@ -225,6 +225,8 @@ function VMCalculator() {
   // Disk state — shared with storage transactions
   const [diskTier, setDiskTier]      = useState("standardssd");
   const [diskRedundancy, setDiskRed] = useState("lrs");
+  const [diskSize, setDiskSize]      = useState("e10");
+  const [diskCount, setDiskCount]    = useState(1);
   const [diskResult, setDiskResult]  = useState(null);
   const [txnResult, setTxnResult]    = useState(null);
   const [bwResult, setBwResult]      = useState(null);
@@ -418,12 +420,16 @@ function VMCalculator() {
         onResult={setDiskResult}
         onDiskTierChange={setDiskTier}
         onRedundancyChange={setDiskRed}
+        onDiskSizeChange={setDiskSize}
+        onDiskCountChange={setDiskCount}
       />
 
       <StorageTxnSection
         region={curRegion}
         diskTier={diskTier}
         redundancy={diskRedundancy}
+        diskSize={diskSize}
+        diskCount={diskCount}
         onResult={setTxnResult}
       />
 
@@ -449,7 +455,14 @@ function VMCalculator() {
 }
 
 // ── Managed Disks Section ─────────────────────────────────────────────────────
-function ManagedDisksSection({ region, onResult, onDiskTierChange, onRedundancyChange }) {
+function ManagedDisksSection({
+  region,
+  onResult,
+  onDiskTierChange,
+  onRedundancyChange,
+  onDiskSizeChange,
+  onDiskCountChange,
+}) {
   const [schema, setSchema]     = useState(null);
   const [formData, setFormData] = useState({});
   const [loading, setLoading]   = useState(false);
@@ -468,9 +481,13 @@ function ManagedDisksSection({ region, onResult, onDiskTierChange, onRedundancyC
       if (json.error) throw new Error(json.error);
       setSchema(json.schema);
       setFormData(json.defaults);
+      onDiskTierChange(json.defaults.diskTier);
+      onRedundancyChange(json.defaults.redundancy);
+      onDiskSizeChange(json.defaults.diskSize);
+      onDiskCountChange(json.defaults.count);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
-  }, []);
+  }, [onDiskCountChange, onDiskSizeChange, onDiskTierChange, onRedundancyChange]);
 
   useEffect(() => { fetchSchema(region); }, [region]);
 
@@ -479,8 +496,12 @@ function ManagedDisksSection({ region, onResult, onDiskTierChange, onRedundancyC
     setFormData(fd); onResult(null);
     const tierChanged = fd.diskTier   !== prev.diskTier;
     const redChanged  = fd.redundancy !== prev.redundancy;
+    const sizeChanged = fd.diskSize   !== prev.diskSize;
+    const countChanged = fd.count     !== prev.count;
     if (tierChanged) onDiskTierChange(fd.diskTier);
     if (redChanged)  onRedundancyChange(fd.redundancy);
+    if (sizeChanged) onDiskSizeChange(fd.diskSize);
+    if (countChanged) onDiskCountChange(fd.count);
     if (tierChanged || redChanged) fetchSchema(region, fd.diskTier, fd.redundancy, fd.diskSize);
   };
 
@@ -516,7 +537,7 @@ function ManagedDisksSection({ region, onResult, onDiskTierChange, onRedundancyC
 }
 
 // ── Storage Transactions Section ──────────────────────────────────────────────
-function StorageTxnSection({ region, diskTier, redundancy, onResult }) {
+function StorageTxnSection({ region, diskTier, redundancy, diskSize, diskCount, onResult }) {
   const [schema, setSchema]     = useState(null);
   const [formData, setFormData] = useState({});
   const [loading, setLoading]   = useState(false);
@@ -544,7 +565,14 @@ function StorageTxnSection({ region, diskTier, redundancy, onResult }) {
     try {
       const res = await fetch(`${API}/vm/storage-transactions/calculate`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ region, disk_tier: diskTier, redundancy, form_data: formData }),
+        body: JSON.stringify({
+          region,
+          disk_tier: diskTier,
+          redundancy,
+          disk_size: diskSize,
+          disk_count: diskCount,
+          form_data: formData,
+        }),
       });
       const json = await res.json();
       if (json.error) throw new Error(json.error);

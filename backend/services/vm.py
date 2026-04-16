@@ -132,6 +132,33 @@ DISK_SIZES = {
     ],
 }
 
+MONTHLY_HOURS = 730.0
+
+# Max paid transactions per hour from Azure Managed Disks pricing tables.
+# Standard SSD limits differ by redundancy. Standard HDD limits only apply
+# to the SKUs Azure documents with a paid-transaction ceiling.
+STANDARD_SSD_TXN_LIMITS = {
+    "lrs": {
+        "e1": 6800, "e2": 13400, "e3": 26600, "e4": 43400,
+        "e6": 81200, "e10": 147200, "e15": 274000, "e20": 502000,
+        "e30": 829200, "e40": 893000, "e50": 1578400, "e60": 2777500,
+        "e70": 4379300, "e80": 9478400,
+    },
+    "zrs": {
+        "e1": 7800, "e2": 15400, "e3": 30600, "e4": 61000,
+        "e6": 114400, "e10": 214000, "e15": 398400, "e20": 737600,
+        "e30": 1238800, "e40": 1344700, "e50": 2405600, "e60": 4243900,
+        "e70": 7353100, "e80": 14706200,
+    },
+}
+
+STANDARD_HDD_TXN_LIMITS = {
+    "s4": 450000,
+    "s6": 858000,
+    "s70": 93000000,
+    "s80": 110000000,
+}
+
 TRANSFER_TYPES = [
     ("interregion",     "Inter Region"),
     ("internetegress",  "Internet Egress"),
@@ -614,7 +641,32 @@ def _build_storage_txn_schema(disk_tier="standardssd"):
         },
     }
 
-def _calc_storage_txn(fd, disk_calc_data, region, disk_tier, redundancy):
+def _get_txn_billable_units(units, disk_tier, redundancy, disk_size, disk_count):
+    if units <= 0:
+        return 0.0
+
+    redundancy = (redundancy or "lrs").lower()
+    disk_size  = (disk_size or "").lower()
+    disk_count = max(float(disk_count or 1), 1.0)
+
+    if disk_tier == "standardssd":
+        hourly_limit = STANDARD_SSD_TXN_LIMITS.get(redundancy, {}).get(disk_size)
+        if hourly_limit:
+            max_units = (hourly_limit * MONTHLY_HOURS * disk_count) / 10000.0
+            return min(units, max_units)
+        return units
+
+    if disk_tier == "standardhdd":
+        hourly_limit = STANDARD_HDD_TXN_LIMITS.get(disk_size)
+        if hourly_limit:
+            max_units = (hourly_limit * MONTHLY_HOURS * disk_count) / 10000.0
+            return min(units, max_units)
+        return units
+
+    return units
+
+
+def _calc_storage_txn(fd, disk_calc_data, region, disk_tier, redundancy, disk_size=None, disk_count=1):
     if disk_tier == "premiumssd":
         return 0.0
     units  = float(fd.get("transactionUnits", 0))
@@ -622,7 +674,8 @@ def _calc_storage_txn(fd, disk_calc_data, region, disk_tier, redundancy):
     price  = _get_txn_price(offers, region, disk_tier)
     if price is None:
         return 0.0
-    return round(price * units, 6)
+    billable_units = _get_txn_billable_units(units, disk_tier, redundancy, disk_size, disk_count)
+    return round(price * billable_units, 6)
 
 
 # ── Bandwidth ─────────────────────────────────────────────────────────────────
@@ -904,7 +957,8 @@ class TxnSchema(Resource):
 
 txn_calc_model = ns.model("TxnCalc", {
     "region": fields.String(required=True), "disk_tier": fields.String(),
-    "redundancy": fields.String(), "form_data": fields.Raw(required=True),
+    "redundancy": fields.String(), "disk_size": fields.String(),
+    "disk_count": fields.Float(), "form_data": fields.Raw(required=True),
 })
 
 @ns.route("/storage-transactions/calculate")
@@ -915,11 +969,17 @@ class TxnCalculate(Resource):
         region     = body.get("region", "us-east")
         disk_tier  = body.get("disk_tier", "standardssd")
         redundancy = body.get("redundancy", "lrs")
+        disk_size  = body.get("disk_size")
+        disk_count = body.get("disk_count", 1)
         fd         = body.get("form_data", {})
         calc, err  = _fetch_disk_calculator()
         if err:
             return {"error": f"Azure disk pricing error: {err}"}, 502
-        return {"monthly_total": _calc_storage_txn(fd, calc, region, disk_tier, redundancy), "currency": "USD", "region": region}
+        return {
+            "monthly_total": _calc_storage_txn(fd, calc, region, disk_tier, redundancy, disk_size, disk_count),
+            "currency": "USD",
+            "region": region,
+        }
 
 
 # ── Bandwidth ─────────────────────────────────────────────────────────────────
