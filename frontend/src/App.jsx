@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Form from "@rjsf/core";
 import validator from "@rjsf/validator-ajv8";
+import AzureVMInstanceField from "./fields/AzureVMInstanceField";
 
 const API = "http://localhost:5000/api";
 
@@ -73,13 +74,21 @@ const S = {
   premiumNote: { fontSize: 12, color: "#666", fontStyle: "italic", padding: "8px 0" },
 };
 
+// ── rjsf field registry — maps "ui:field" keys to custom components ───────────
+const CUSTOM_FIELDS = {
+  azureVMInstanceField: AzureVMInstanceField,
+};
+
+// ── uiSchemas ─────────────────────────────────────────────────────────────────
+
 const UI_VM = {
-  region:           { "ui:widget": "select" },
-  operatingSystem:  { "ui:widget": "select" },
-  linuxType:        { "ui:widget": "select" },
-  tier:             { "ui:widget": "select" },
-  size:             { "ui:widget": "select" },
-  addHybridBenefit: { "ui:widget": "hidden" },
+  region:            { "ui:widget": "select" },
+  operatingSystem:   { "ui:widget": "select" },
+  linuxType:         { "ui:widget": "select" },
+  tier:              { "ui:widget": "select" },
+  // Delegate the entire instanceSelector object to our custom field.
+  instanceSelector:  { "ui:field": "azureVMInstanceField" },
+  addHybridBenefit:  { "ui:widget": "hidden" },
 };
 
 const UI_DISK = {
@@ -134,6 +143,7 @@ function FunctionsCalculator() {
 
   const handleCalculate = async () => {
     setCalc(true); setError(null);
+    console.log({tier, region: formData.region || region, form_data: formData})
     try {
       const res  = await fetch(`${API}/functions/calculate`, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -219,47 +229,77 @@ function VMCalculator() {
   const [txnResult, setTxnResult]    = useState(null);
   const [bwResult, setBwResult]      = useState(null);
 
+  const normalizeVMFormData = useCallback((fd = {}) => {
+    const {
+      category,
+      series,
+      instanceSize,
+      instanceSelector,
+      ...rest
+    } = fd || {};
+
+    const normalizedSelector = {
+      ...(instanceSelector || {}),
+    };
+
+    if (!normalizedSelector.category && category) {
+      normalizedSelector.category = category;
+    }
+    if (!normalizedSelector.series && series) {
+      normalizedSelector.series = series;
+    }
+    if (!normalizedSelector.instanceSize && instanceSize) {
+      normalizedSelector.instanceSize = instanceSize;
+    }
+
+    return {
+      ...rest,
+      instanceSelector: normalizedSelector,
+    };
+  }, []);
+
   const fetchSchema = useCallback(async (r, o, lt, t, prev = {}) => {
     setLoading(true); setError(null); setVmResult(null);
     try {
       const p = new URLSearchParams({ region: r, operatingSystem: o, linuxType: lt, tier: t });
-      if (prev.size) p.set("size", prev.size);
       const res  = await fetch(`${API}/vm/schema?${p}`);
       const json = await res.json();
       if (json.error) throw new Error(json.error);
-      const sizeEnum = json.schema?.properties?.size?.enum || [];
 
+      const normalizedPrev = normalizeVMFormData(prev);
       const next = {
         ...json.defaults,
         region: r, operatingSystem: o, linuxType: lt, tier: t,
-        count: prev.count !== undefined ? prev.count : json.defaults.count,
-        hours: prev.hours !== undefined ? prev.hours : json.defaults.hours,
+        count: normalizedPrev.count !== undefined ? normalizedPrev.count : json.defaults.count,
+        hours: normalizedPrev.hours !== undefined ? normalizedPrev.hours : json.defaults.hours,
         addHybridBenefit: ahb,
+        // Preserve instanceSelector selection across schema refreshes.
+        instanceSelector: normalizedPrev.instanceSelector || {},
       };
-      if (sizeEnum.includes(prev.size)) next.size = prev.size;
       setSchema(json.schema);
       setFormData(next);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
-  }, [ahb]);
+  }, [ahb, normalizeVMFormData]);
 
   useEffect(() => { fetchSchema(region, os, linuxType, tier); }, []);
 
   const handleChange = ({ formData: fd }) => {
-    const merged = {
-      ...formData,
-      ...fd,
-      count: fd?.count ?? formData.count ?? schema?.properties?.count?.default ?? 1,
-      hours: fd?.hours ?? formData.hours ?? schema?.properties?.hours?.default ?? 730,
+    const normalized = normalizeVMFormData(fd);
+    const next = {
+      ...normalized,
+      count: normalized?.count ?? formData.count ?? schema?.properties?.count?.default ?? 1,
+      hours: normalized?.hours ?? formData.hours ?? schema?.properties?.hours?.default ?? 730,
+      addHybridBenefit: normalized?.addHybridBenefit ?? formData.addHybridBenefit ?? ahb,
     };
-    setFormData(merged); setVmResult(null);
-    const nr  = merged.region          || region;
-    const no  = merged.operatingSystem || os;
-    const nlt = merged.linuxType       || linuxType;
-    const nt  = merged.tier            || tier;
+    setFormData(next); setVmResult(null);
+    const nr  = next.region          || region;
+    const no  = next.operatingSystem || os;
+    const nlt = next.linuxType       || linuxType;
+    const nt  = next.tier            || tier;
     if (nr !== region || no !== os || nlt !== linuxType || nt !== tier) {
       setRegion(nr); setOs(no); setLinuxType(nlt); setTier(nt);
-      fetchSchema(nr, no, nlt, nt, merged);
+      fetchSchema(nr, no, nlt, nt, next);
     }
   };
 
@@ -269,14 +309,16 @@ function VMCalculator() {
     setVmResult(null);
   };
 
-  const handleCalculate = async () => {
+  const handleCalculate = async ({ formData: submittedFormData } = {}) => {
     setCalc(true); setError(null);
+    const payloadFormData = normalizeVMFormData(submittedFormData || formData);
+    console.log({ tier, region: payloadFormData.region || region, form_data: payloadFormData });
     try {
       const res = await fetch(`${API}/vm/calculate`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          region: formData.region || region,
-          form_data: { ...formData, addHybridBenefit: ahb },
+          region: payloadFormData.region || region,
+          form_data: { ...payloadFormData, addHybridBenefit: ahb },
         }),
       });
       const json = await res.json();
@@ -340,6 +382,7 @@ function VMCalculator() {
             <Form
               schema={rjsfSchema}
               uiSchema={UI_VM}
+              fields={CUSTOM_FIELDS}
               formData={formData}
               onChange={handleChange}
               validator={validator}

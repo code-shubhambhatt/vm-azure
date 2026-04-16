@@ -6,17 +6,39 @@ Billing: PAYG only.
 Windows: License Included or Azure Hybrid Benefit.
 Linux subtypes: populated dynamically from VM metadata linuxTypes array.
 
+Instance selector endpoints (MongoDB-backed, no Azure call):
+  /vm/instances/categories   — all distinct categories
+  /vm/instances/series       — series filtered by ?category=
+  /vm/instances/sizes        — sizes filtered by ?category= & ?series=
+
 Add-on sections:
   /vm/managed-disks/*        — Tier + Redundancy + Disk Size + Count
   /vm/storage-transactions/* — inherits disk tier from managed disks
   /vm/bandwidth/*            — Data Transfer Type, Source Region, Destination Region, GB
 """
 
+import os
 from flask import request
 from flask_restx import Namespace, Resource, fields
+from pymongo import MongoClient
+from dotenv import load_dotenv
 from .shared import fetch_pricing, fetch_metadata, get_graduated_price
 
+load_dotenv()
+
 ns = Namespace("vm", description="Azure Virtual Machines pricing")
+
+# ── MongoDB ───────────────────────────────────────────────────────────────────
+_mongo_client = None
+
+def _get_collection():
+    global _mongo_client
+    if _mongo_client is None:
+        uri = os.getenv("MONGO_URI")
+        if not uri:
+            raise RuntimeError("MONGO_URI not set")
+        _mongo_client = MongoClient(uri)
+    return _mongo_client["Cloud"]["azure"]
 
 # ── API URLs ──────────────────────────────────────────────────────────────────
 VM_METADATA_URL   = "https://azure.microsoft.com/api/v4/pricing/virtual-machines/metadata/"
@@ -343,47 +365,10 @@ def _build_vm_schema(meta, calc_data, region, operating_system="linux",
     linux_type_names = [n for _, n in linux_types]
     linux_type_default = linux_type if linux_type in linux_type_enum else linux_type_enum[0]
 
-    allowed_slugs = {s["slug"] for s in meta.get("sizesPayGo", [])}
-    all_category  = next((c for c in meta.get("dropdown", []) if c["slug"] == "all"), {})
-
-    size_enum = []
-    size_names = []
-    seen = set()
-
-    for series in all_category.get("series", []):
-        for inst in series.get("instances", []):
-            slug = inst["slug"]
-            if slug not in allowed_slugs or slug in seen:
-                continue
-            price = _get_vm_hourly(offers, region, slug, tier, operating_system,
-                                   linux_type_default, ahb=False)
-            if price is None:
-                continue
-            offer = (
-                _get_offer(offers, f"{operating_system}-{slug}-{tier}")
-                or _get_offer(offers, f"linux-{slug}-{tier}")
-                or _get_offer(offers, f"windows-{slug}-{tier}")
-            )
-            cores   = offer.get("cores", "?")
-            ram     = offer.get("ram", "?")
-            disk    = offer.get("diskSize", "")
-            display = inst.get("displayName", slug)
-            label   = (display.replace("{0}", str(cores))
-                               .replace("{1}", str(ram))
-                               .replace("{2}", str(disk) if disk else "—"))
-            label  += f" — ${price:.4f}/hr"
-            size_enum.append(slug)
-            size_names.append(label)
-            seen.add(slug)
-
-    default_size = selected_size or calc_data.get("schema", {}).get("size", "d2v3")
-    if default_size not in size_enum and size_enum:
-        default_size = size_enum[0]
-
     return {
         "type": "object",
         "title": "Azure Virtual Machines",
-        "required": ["region", "operatingSystem", "tier", "size", "count", "hours"],
+        "required": ["region", "operatingSystem", "tier", "instanceSelector", "count", "hours"],
         "properties": {
             "region": {
                 "type": "string", "title": "Region",
@@ -405,11 +390,16 @@ def _build_vm_schema(meta, calc_data, region, operating_system="linux",
                 "enum": tier_enum, "enumNames": tier_names,
                 "default": tier,
             },
-            "size": {
-                "type": "string", "title": "Instance Size",
-                "enum":      size_enum  if size_enum  else [default_size],
-                "enumNames": size_names if size_names else [default_size],
-                "default": default_size,
+            # instanceSelector is now an object owned by the custom React field.
+            # The backend only needs the slug from instanceSelector.instanceSize for pricing.
+            "instanceSelector": {
+                "type": "object",
+                "title": "Instance",
+                "properties": {
+                    "category":     {"type": "string"},
+                    "series":       {"type": "string"},
+                    "instanceSize": {"type": "string"},
+                },
             },
             "addHybridBenefit": {
                 "type": "boolean", "title": "Azure Hybrid Benefit",
@@ -424,11 +414,19 @@ def _build_vm_schema(meta, calc_data, region, operating_system="linux",
 def _calc_vm(fd, calc_data, region):
     os_   = fd.get("operatingSystem", "linux")
     lt_   = fd.get("linuxType", "ubuntu")
-    size_ = fd.get("size", "")
     tier_ = fd.get("tier", "standard")
     count = float(fd.get("count", 1))
     hours = float(fd.get("hours", 730))
     ahb   = fd.get("addHybridBenefit", False)
+
+    # Support both old flat `size` key (backwards compat) and new nested instanceSelector.
+    inst_sel = fd.get("instanceSelector") or {}
+    size_ = (
+        inst_sel.get("instanceSize")
+        or fd.get("instanceSize")
+        or fd.get("size", "")
+    )
+
     if not size_:
         return None   # caller returns 400
     offers = calc_data.get("offers", {})
@@ -436,6 +434,90 @@ def _calc_vm(fd, calc_data, region):
     if price is None:
         return None
     return round(price * hours * count, 4)
+
+
+# ── Instance Selector — MongoDB-backed endpoints ──────────────────────────────
+
+@ns.route("/instances/categories")
+class InstanceCategories(Resource):
+    def get(self):
+        """Return all distinct VM categories stored in MongoDB."""
+        try:
+            col = _get_collection()
+            # Use aggregation to get unique category + category_display pairs, sorted.
+            pipeline = [
+                {"$match": {"provider": "azure"}},
+                {"$group": {
+                    "_id": "$category",
+                    "display": {"$first": "$category_display"},
+                }},
+                {"$sort": {"_id": 1}},
+            ]
+            docs = list(col.aggregate(pipeline))
+            return {
+                "categories": [
+                    {"slug": d["_id"], "display": d["display"]}
+                    for d in docs
+                ]
+            }
+        except Exception as e:
+            return {"error": str(e)}, 500
+
+
+@ns.route("/instances/series")
+class InstanceSeries(Resource):
+    def get(self):
+        """Return distinct series, optionally filtered by ?category=<slug>."""
+        try:
+            col      = _get_collection()
+            category = request.args.get("category", "").strip()
+            match    = {"provider": "azure"}
+            if category:
+                match["category"] = category
+            pipeline = [
+                {"$match": match},
+                {"$group": {
+                    "_id": "$series",
+                    "display": {"$first": "$series_display"},
+                }},
+                {"$sort": {"_id": 1}},
+            ]
+            docs = list(col.aggregate(pipeline))
+            return {
+                "series": [
+                    {"slug": d["_id"], "display": d["display"]}
+                    for d in docs
+                ]
+            }
+        except Exception as e:
+            return {"error": str(e)}, 500
+
+
+@ns.route("/instances/sizes")
+class InstanceSizes(Resource):
+    def get(self):
+        """
+        Return instance sizes, optionally filtered by ?category= and/or ?series=.
+        Each item includes slug, displayName, and optional vcpus/ram for rich labels.
+        """
+        try:
+            col      = _get_collection()
+            category = request.args.get("category", "").strip()
+            series   = request.args.get("series",   "").strip()
+            match    = {"provider": "azure"}
+            if category:
+                match["category"] = category
+            if series:
+                match["series"] = series
+            docs = list(
+                col.find(
+                    match,
+                    {"_id": 0, "slug": 1, "displayName": 1, "vcpus": 1, "ram": 1},
+                ).sort("slug", 1)
+            )
+            return {"sizes": docs}
+        except Exception as e:
+            return {"error": str(e)}, 500
 
 
 # ── Managed Disks ─────────────────────────────────────────────────────────────
@@ -544,10 +626,6 @@ def _calc_storage_txn(fd, disk_calc_data, region, disk_tier, redundancy):
 
 
 # ── Bandwidth ─────────────────────────────────────────────────────────────────
-# v4 BW endpoint: region-parameterised, offers keyed like:
-#   "interregion-{src}-{dest}"  or  "interregion-{src}"  (inter-region transfer)
-#   "internet-egress-{src}"     or  "internet-egress"    (internet egress)
-# Transfer types match Azure UI: "Inter Region" and "Internet Egress"
 
 def _build_bw_schema(bw_calc_data, region):
     vm_meta, _ = _fetch_vm_metadata()
@@ -613,17 +691,14 @@ def _calc_bw(fd, bw_calc_data, region):
             offer = _get_offer(offers, key)
             if not offer:
                 continue
-            # v2 API: graduated tiers — get_graduated_price returns per-GB rate for the tier
             tiers = offer.get("tiers")
             if isinstance(tiers, list) and tiers:
                 per_gb = get_graduated_price(tiers, egress_gb)
                 if per_gb is not None:
                     return per_gb * egress_gb
-            # v2 API: flat price keyed by region slug or "global"
             p = _get_price_v2(offer, src_region)
             if p is not None:
                 return p * egress_gb
-            # v4-style price keys
             for pk in ("pergb", "perunit"):
                 p = _get_price_v4(offer, pk, src_region)
                 if p is not None:
@@ -631,8 +706,6 @@ def _calc_bw(fd, bw_calc_data, region):
         return None
 
     if transfer_type == "internetegress":
-        # Internet egress: first 100 GB/month free, then tiered by source zone + routing.
-        # Azure API offer keys differ by routing: "internet-egress-zone{n}" vs "isp-egress-zone{n}"
         if routed_via == "isp":
             offer_keys = [
                 f"isp-egress-zone{src_zone}",
@@ -649,9 +722,6 @@ def _calc_bw(fd, bw_calc_data, region):
             ]
         price = _try_offer(offer_keys)
 
-        # Hardcoded fallback using Azure's published tiered rates.
-        # First 100 GB/month free; rate from INTERNET_EGRESS_RATES for "next 10 TB" tier.
-        # Source: https://azure.microsoft.com/en-us/pricing/details/bandwidth/
         if price is None:
             FREE_GB  = 100.0
             billable = max(egress_gb - FREE_GB, 0.0)
@@ -662,8 +732,6 @@ def _calc_bw(fd, bw_calc_data, region):
             price = rate * billable
 
     else:
-        # Inter-region: Azure gives first 5 GB/month free, then per-GB by zone pair.
-        # routedVia is not applicable for inter-region transfers.
         price = _try_offer([
             f"interregion-zone{src_zone}-zone{dest_zone}",
             f"interregion-zone{dest_zone}-zone{src_zone}",
@@ -672,9 +740,6 @@ def _calc_bw(fd, bw_calc_data, region):
             f"interregion-zone{src_zone}",
             "interregion",
         ])
-        # Hardcoded fallback using Azure's published inter-region rates.
-        # 5 GB/month free, then flat per-GB based on intra vs inter-continental.
-        # Source: https://azure.microsoft.com/en-us/pricing/details/bandwidth/
         if price is None:
             FREE_GB  = 5.0
             billable = max(egress_gb - FREE_GB, 0.0)
@@ -705,7 +770,10 @@ def _calc_bw(fd, bw_calc_data, region):
             price = rate * billable
 
     return round(price, 4) if price is not None else 0.0
-# ── Debug: inspect actual software offer keys in VM calculator ────────────────
+
+
+# ── Debug endpoints ───────────────────────────────────────────────────────────
+
 @ns.route("/debug/software-offers")
 class SoftwareOfferDebug(Resource):
     def get(self):
@@ -747,7 +815,7 @@ class BandwidthOfferDebug(Resource):
         }
 
 
-
+# ── Route handlers ────────────────────────────────────────────────────────────
 
 @ns.route("/schema")
 class Schema(Resource):
@@ -756,7 +824,6 @@ class Schema(Resource):
         os_      = request.args.get("operatingSystem", "linux")
         lt_      = request.args.get("linuxType", "ubuntu")
         tier     = request.args.get("tier", "standard")
-        sel_size = request.args.get("size")
 
         meta, err = _fetch_vm_metadata()
         if err:
@@ -765,7 +832,7 @@ class Schema(Resource):
         if err:
             return {"error": f"Azure calculator error: {err}"}, 502
 
-        schema = _build_vm_schema(meta, calc, region, os_, lt_, tier, sel_size)
+        schema = _build_vm_schema(meta, calc, region, os_, lt_, tier)
         props  = schema["properties"]
         return {"schema": schema, "defaults": {k: v["default"] for k, v in props.items() if "default" in v}}
 
