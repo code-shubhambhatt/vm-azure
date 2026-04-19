@@ -51,6 +51,31 @@ def fetch_metadata():
     return resp.json()
 
 
+def _get_offer_specs(offers, instance_slug):
+    """
+    Look up vCPUs, RAM, and other specs from offers.
+    Tries both windows and linux variants of the instance, returns first match.
+    """
+    specs = {}
+    # Try to find the offer data for this instance
+    # Offers are keyed as "{os}-{size}-{tier}", try common tiers
+    for os_type in ["linux", "windows"]:
+        for tier in ["standard", "premium", "standardssd", "premiumssd"]:
+            offer_key = f"{os_type}-{instance_slug}-{tier}"
+            if offer_key in offers:
+                offer = offers[offer_key]
+                # Extract available specs
+                if "cores" in offer:
+                    specs["vcpus"] = int(float(offer["cores"]))
+                if "ram" in offer:
+                    specs["ram"] = float(offer["ram"])
+                if "diskSize" in offer:
+                    specs["diskSize"] = offer["diskSize"]
+                if specs:  # Return first match with any specs
+                    return specs
+    return specs
+
+
 def build_documents(meta):
     """
     Parse meta['dropdown'] into flat documents.
@@ -73,11 +98,12 @@ def build_documents(meta):
     We skip the "all" category — it's just a flat duplicate of everything else.
     Each real category → series → instance becomes one document.
 
-    Instance documents include vcpus, ram, and diskSize where available so
-    the frontend custom field can display rich labels without an extra API call.
+    Instance documents include vcpus, ram, and diskSize from both instance metadata
+    and fallback to offers lookup.
     """
     allowed_slugs = {s["slug"] for s in meta.get("sizesPayGo", [])}
     categories    = [c for c in meta.get("dropdown", []) if c["slug"] != "all"]
+    offers        = meta.get("offers", {})
     now           = datetime.now(timezone.utc)
 
     docs          = []
@@ -108,11 +134,21 @@ def build_documents(meta):
                     continue
                 seen.add(key)
 
-                # Extract hardware specs — present in the metadata instances array.
-                # Replace template placeholders Azure uses in displayName strings.
+                # Extract hardware specs — first try instance metadata, then fall back to offers
                 vcpus    = inst.get("cores")
                 ram      = inst.get("ram")
                 disk     = inst.get("diskSize")
+                
+                # Fallback to offers lookup if specs not in instance metadata
+                if vcpus is None or ram is None or disk is None:
+                    offer_specs = _get_offer_specs(offers, slug)
+                    if vcpus is None:
+                        vcpus = offer_specs.get("vcpus")
+                    if ram is None:
+                        ram = offer_specs.get("ram")
+                    if disk is None:
+                        disk = offer_specs.get("diskSize")
+                
                 raw_name = inst.get("displayName", slug)
                 display  = (raw_name
                             .replace("{0}", str(vcpus) if vcpus is not None else "?")
@@ -175,6 +211,11 @@ def seed(docs):
     #   /instances/sizes       — filter by (provider, category, series)
     col.create_index([("provider", 1), ("category", 1)])
     col.create_index([("provider", 1), ("category", 1), ("series", 1)])
+    # Drop old index if it exists (without unique constraint) before creating new one
+    try:
+        col.drop_index("provider_1_slug_1")
+    except:
+        pass
     col.create_index([("provider", 1), ("slug", 1)], unique=True,
                      partialFilterExpression={"provider": {"$exists": True}})
     print("Indexes ensured.")
