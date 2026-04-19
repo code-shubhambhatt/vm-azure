@@ -30,7 +30,10 @@ interface VMInstanceData {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const AzureVMInstanceField: React.FC<FieldProps<VMInstanceData>> = (props) => {
-  const { formData, onChange, name, required } = props;
+  const { formData, onChange, name, required, formContext } = props;
+
+  // Region comes from the parent form via formContext — no local state needed.
+  const region: string = formContext?.region || 'us-east';
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [categories,    setCategories]    = useState<Category[]>([]);
@@ -47,8 +50,8 @@ const AzureVMInstanceField: React.FC<FieldProps<VMInstanceData>> = (props) => {
   const [error,         setError]         = useState<string | null>(null);
 
   useEffect(() => {
-    setSelectedCat(formData?.category || '');
-    setSelectedSeries(formData?.series || '');
+    setSelectedCat(formData?.category     || '');
+    setSelectedSeries(formData?.series       || '');
     setSelectedSize(formData?.instanceSize || '');
   }, [formData]);
 
@@ -56,6 +59,13 @@ const AzureVMInstanceField: React.FC<FieldProps<VMInstanceData>> = (props) => {
   useEffect(() => {
     fetchCategories();
   }, []);
+
+  // ── Re-fetch sizes when parent region changes ──────────────────────────────
+  useEffect(() => {
+    if (selectedCat && selectedSeries) {
+      fetchSizes(selectedCat, selectedSeries, region);
+    }
+  }, [region]);
 
   // ── Cascade: category change → fetch series ────────────────────────────────
   useEffect(() => {
@@ -72,7 +82,7 @@ const AzureVMInstanceField: React.FC<FieldProps<VMInstanceData>> = (props) => {
   // ── Cascade: series change → fetch sizes ──────────────────────────────────
   useEffect(() => {
     if (selectedCat && selectedSeries) {
-      fetchSizes(selectedCat, selectedSeries);
+      fetchSizes(selectedCat, selectedSeries, region);
     } else {
       setSizes([]);
       setSelectedSize('');
@@ -108,12 +118,12 @@ const AzureVMInstanceField: React.FC<FieldProps<VMInstanceData>> = (props) => {
     }
   };
 
-  const fetchSizes = async (category: string, series: string): Promise<void> => {
+  const fetchSizes = async (category: string, series: string, region: string): Promise<void> => {
     setLoadingSizes(true);
     setError(null);
     try {
       const res = await axios.get(
-        `/api/vm/instances/sizes?category=${encodeURIComponent(category)}&series=${encodeURIComponent(series)}`
+        `/api/vm/instances/sizes?category=${encodeURIComponent(category)}&series=${encodeURIComponent(series)}&region=${encodeURIComponent(region)}`
       );
       const incoming: InstanceSize[] = res.data.sizes || [];
       setSizes(incoming);
@@ -122,8 +132,7 @@ const AzureVMInstanceField: React.FC<FieldProps<VMInstanceData>> = (props) => {
       if (selectedSize && !incoming.find(s => s.slug === selectedSize)) {
         setSelectedSize('');
         notifyChange(category, series, '');
-      }
-    } catch (err) {
+      }    } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load sizes');
       setSizes([]);
     } finally {
@@ -166,7 +175,7 @@ const AzureVMInstanceField: React.FC<FieldProps<VMInstanceData>> = (props) => {
     } else if (!selectedSeries) {
       fetchSeries(selectedCat);
     } else {
-      fetchSizes(selectedCat, selectedSeries);
+      fetchSizes(selectedCat, selectedSeries, region);
     }
   };
 

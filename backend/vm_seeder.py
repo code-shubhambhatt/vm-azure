@@ -24,7 +24,11 @@ MONGO_URI   = os.getenv("MONGO_URI")
 DB_NAME     = "Cloud"
 COLLECTION  = "azure"
 
-VM_METADATA_URL = "https://azure.microsoft.com/api/v4/pricing/virtual-machines/metadata/"
+VM_METADATA_URL    = "https://azure.microsoft.com/api/v4/pricing/virtual-machines/metadata/"
+VM_CALCULATOR_URL  = (
+    "https://azure.microsoft.com/api/v4/pricing/virtual-machines/"
+    "calculator/{region}/?culture=en-us&discount=mca"
+)
 
 HEADERS = {
     "User-Agent": (
@@ -74,6 +78,69 @@ def _get_offer_specs(offers, instance_slug):
                 if specs:  # Return first match with any specs
                     return specs
     return specs
+
+
+def fetch_region_list(meta):
+    """Return list of region dicts [{slug, displayName}, ...] from metadata."""
+    return meta.get("regions", [])
+
+
+def fetch_region_availability(meta):
+    """
+    For every region in metadata, call the v4 calculator endpoint and collect
+    which instance slugs have at least one offer key (linux or windows, any tier).
+
+    Returns: dict  { region_slug: set(instance_slug, ...) }
+
+    An instance is considered available in a region if any offer key of the form
+      "linux-{slug}-{tier}"  or  "windows-{slug}-{tier}"
+    exists in that region's calculator response.
+    """
+    regions = fetch_region_list(meta)
+    if not regions:
+        print("  WARNING: No regions found in metadata — skipping availability seeding.")
+        return {}
+
+    # Pre-build the set of all known slugs so we can match quickly.
+    all_slugs = {s["slug"] for s in meta.get("sizesPayGo", [])}
+
+    region_availability = {}   # { region_slug: set(slug) }
+    total = len(regions)
+
+    for i, region in enumerate(regions, 1):
+        r_slug = region.get("slug", "")
+        if not r_slug:
+            continue
+        url = VM_CALCULATOR_URL.format(region=r_slug)
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=45)
+            resp.raise_for_status()
+            calc = resp.json()
+        except Exception as e:
+            print(f"  [{i}/{total}] WARN: Could not fetch {r_slug}: {e}")
+            region_availability[r_slug] = set()
+            continue
+
+        offers = calc.get("offers", {})
+        available = set()
+        for offer_key in offers:
+            # offer keys: "linux-{slug}-{tier}" or "windows-{slug}-{tier}"
+            parts = offer_key.split("-", 1)   # ["linux", "{slug}-{tier}"]
+            if parts[0] not in ("linux", "windows") or len(parts) < 2:
+                continue
+            # slug is everything between the os prefix and the last "-{tier}" suffix
+            # tiers: standard, basic, lowpriority, spot, etc.
+            rest = parts[1]   # "{slug}-{tier}"
+            # walk known slugs — match greedily from left
+            for slug in all_slugs:
+                if rest == slug or rest.startswith(slug + "-"):
+                    available.add(slug)
+                    break
+
+        region_availability[r_slug] = available
+        print(f"  [{i}/{total}] {r_slug}: {len(available)} instances available")
+
+    return region_availability
 
 
 def build_documents(meta):
@@ -182,9 +249,19 @@ def build_documents(meta):
     return docs
 
 
-def seed(docs):
+def seed(docs, region_availability):
     client = MongoClient(MONGO_URI)
     col    = client[DB_NAME][COLLECTION]
+
+    # Attach available_regions list to each doc before upserting.
+    for doc in docs:
+        slug = doc["slug"]
+        regions = [
+            r_slug
+            for r_slug, available_slugs in region_availability.items()
+            if slug in available_slugs
+        ]
+        doc["available_regions"] = sorted(regions)
 
     # Upsert — safe to re-run without duplicates.
     # The filter uses the natural compound key; $set refreshes all fields including updatedAt.
@@ -209,6 +286,7 @@ def seed(docs):
     #   /instances/categories  — distinct on (provider, category)
     #   /instances/series      — filter by (provider, category), distinct on series
     #   /instances/sizes       — filter by (provider, category, series)
+    col.create_index([("provider", 1), ("available_regions", 1)])
     col.create_index([("provider", 1), ("category", 1)])
     col.create_index([("provider", 1), ("category", 1), ("series", 1)])
     # Drop old index if it exists (without unique constraint) before creating new one
@@ -228,5 +306,8 @@ if __name__ == "__main__":
     meta = fetch_metadata()
     docs = build_documents(meta)
     print(f"Built {len(docs)} instance documents.")
-    seed(docs)
+    print("Fetching per-region availability (this may take a few minutes)...")
+    region_availability = fetch_region_availability(meta)
+    print(f"Fetched availability for {len(region_availability)} regions.")
+    seed(docs, region_availability)
     print("Done.")

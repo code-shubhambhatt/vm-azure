@@ -465,6 +465,23 @@ def _calc_vm(fd, calc_data, region):
 
 # ── Instance Selector — MongoDB-backed endpoints ──────────────────────────────
 
+@ns.route("/instances/regions")
+class InstanceRegions(Resource):
+    def get(self):
+        """Return all Azure regions from VM metadata (slug + displayName)."""
+        meta, err = _fetch_vm_metadata()
+        if err:
+            return {"error": f"Azure metadata error: {err}"}, 502
+        regions = meta.get("regions", [])
+        return {
+            "regions": [
+                {"slug": r["slug"], "display": r["displayName"]}
+                for r in regions
+                if r.get("slug")
+            ]
+        }
+
+
 @ns.route("/instances/categories")
 class InstanceCategories(Resource):
     def get(self):
@@ -524,18 +541,22 @@ class InstanceSeries(Resource):
 class InstanceSizes(Resource):
     def get(self):
         """
-        Return instance sizes, optionally filtered by ?category= and/or ?series=.
+        Return instance sizes, optionally filtered by ?category=, ?series=, and/or ?region=.
+        When ?region= is provided, only instances available in that region are returned.
         Each item includes slug, displayName, and optional vcpus/ram for rich labels.
         """
         try:
             col      = _get_collection()
             category = request.args.get("category", "").strip()
             series   = request.args.get("series",   "").strip()
+            region   = request.args.get("region",   "").strip()
             match    = {"provider": "azure"}
             if category:
                 match["category"] = category
             if series:
                 match["series"] = series
+            if region:
+                match["available_regions"] = {"$in": [region]}
             docs = list(
                 col.find(
                     match,
