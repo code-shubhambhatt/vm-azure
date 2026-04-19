@@ -1,0 +1,108 @@
+{
+    "serviceid": 49,
+    "serviceshortname": "azurefunctions",
+    "uischema": {
+      "ui:order": [
+        "function_name",
+        "function_app_name",
+        "region",
+        "runtime",
+        "runtime_version",
+        "plan_type",
+        "sku_tier",
+        "trigger_type",
+        "file_upload",
+        "github_branch",
+        "memory_mb",
+        "timeout_seconds",
+        "storage_account",
+        "vnet_integration",
+        "environment",
+        "tags",
+        "*"
+      ],
+      "function_name": {
+        "ui:help": "A unique name for your Azure Function"
+      },
+      "function_app_name": {
+        "ui:help": "The host Function App name that will contain this function"
+      },
+      "region": {
+        "ui:help": "Select the Azure region closest to your users"
+      },
+      "runtime": {
+        "ui:help": "Choose the programming language runtime"
+      },
+      "runtime_version": {
+        "ui:help": "Specify the runtime version (e.g., 3.9 for Python, 16.x for Node.js)"
+      },
+      "plan_type": {
+        "ui:help": "Consumption: Pay-per-execution (default); Premium: Always-on with guaranteed capacity; Dedicated: App Service Plan"
+      },
+      "sku_tier": {
+        "ui:help": "Select the SKU tier for Premium or Dedicated plans"
+      },
+      "trigger_type": {
+        "ui:help": "The event that triggers function execution (HTTP, Timer, Blob Storage, Queue, etc.)"
+      },
+      "file_upload": {
+        "ui:field": "s3UploadField",
+        "ui:options": {
+          "maxFiles": 1,
+          "allowedExtensions": [
+            "zip"
+          ],
+          "allowedMimeTypes": [
+            "application/zip"
+          ]
+        },
+        "ui:help": "Upload the function code as a ZIP package"
+      },
+      "github_branch": {
+        "ui:help": "Connect to a GitHub repository for continuous deployment"
+      },
+      "memory_mb": {
+        "ui:help": "Memory allocation (Premium/Dedicated plans only). Consumption plan has fixed memory."
+      },
+      "timeout_seconds": {
+        "ui:help": "Maximum execution time before the function times out"
+      },
+      "storage_account": {
+        "ui:help": "Azure Storage account for function state, bindings, and logs"
+      },
+      "vnet_integration": {
+        "ui:help": "Enable VNet integration for secure network access (Premium/Dedicated only)",
+        "enabled": {
+          "ui:help": "Check to enable VNet integration"
+        },
+        "vnet": {
+          "ui:help": "Select the virtual network"
+        },
+        "subnet": {
+          "ui:help": "Select the subnet for integration"
+        }
+      },
+      "environment": {
+        "ui:help": "Add environment variables for your function",
+        "items": {
+          "key": {
+            "ui:placeholder": "e.g., DATABASE_CONNECTION"
+          },
+          "value": {
+            "ui:placeholder": "e.g., connection-string-here"
+          }
+        }
+      },
+      "tags": {
+        "ui:help": "Add tags for cost tracking and resource organization",
+        "items": {
+          "key": {
+            "ui:placeholder": "e.g., Environment"
+          },
+          "value": {
+            "ui:placeholder": "e.g., Production"
+          }
+        }
+      }
+    }
+  }

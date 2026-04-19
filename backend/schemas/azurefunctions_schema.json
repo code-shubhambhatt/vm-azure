@@ -1,0 +1,281 @@
+{
+    "serviceid": 49,
+    "serviceshortname": "azurefunctions",
+    "deploymentconfig": {
+      "title": "Azure Functions Configuration",
+      "type": "object",
+      "properties": {
+        "function_name": {
+          "title": "Function Name",
+          "type": "string",
+          "description": "The name of the Azure Function.",
+          "default": "my-function"
+        },
+        "function_app_name": {
+          "title": "Function App Name",
+          "type": "string",
+          "description": "The name of the Function App that will host the function.",
+          "default": "my-function-app"
+        },
+        "region": {
+          "title": "Region",
+          "type": "string",
+          "description": "The Azure region where the Function App will be deployed.",
+          "default": "eastus",
+          "enum": [
+            "eastus",
+            "eastus2",
+            "westus",
+            "westus2",
+            "westus3",
+            "centralus",
+            "northcentralus",
+            "southcentralus",
+            "westcentralus",
+            "canadaeast",
+            "canadacentral",
+            "northeurope",
+            "westeurope",
+            "uksouth",
+            "ukwest",
+            "francecentral",
+            "francesouth",
+            "switzerlandnorth",
+            "switzerlandwest",
+            "norwayeast",
+            "norwaywest",
+            "swedencentral",
+            "eastasia",
+            "southeastasia",
+            "japaneast",
+            "japanwest",
+            "koreacentral",
+            "koreasouth",
+            "centralindia",
+            "southindia",
+            "westindia",
+            "australiaeast",
+            "australiasoutheast",
+            "australiacentral",
+            "australiacentral2",
+            "newzealandnorth",
+            "brazilsouth",
+            "brazilsoutheast",
+            "uaenorth",
+            "uaecentral",
+            "southafricanorth",
+            "southafricawest",
+            "israelcentral",
+            "qatarcentral"
+          ]
+        },
+        "runtime": {
+          "title": "Runtime",
+          "type": "string",
+          "description": "The runtime environment for the Azure Function.",
+          "default": "python",
+          "enum": [
+            "python",
+            "nodejs",
+            "java",
+            "csharp",
+            "powershell",
+            "typescript"
+          ]
+        },
+        "runtime_version": {
+          "title": "Runtime Version",
+          "type": "string",
+          "description": "The version of the runtime (e.g., 3.9, 16.x, 11, 6.0, 7.4, 4.8).",
+          "default": "3.9"
+        },
+        "plan_type": {
+          "title": "Hosting Plan",
+          "type": "string",
+          "description": "The hosting plan for the Function App.",
+          "enum": [
+            "consumption",
+            "premium",
+            "dedicated"
+          ],
+          "default": "consumption"
+        },
+        "sku_tier": {
+          "title": "SKU Tier",
+          "type": "string",
+          "description": "The SKU tier for Premium or Dedicated plans (e.g., P1V2, P2V2, B1, S1, S2).",
+          "default": "P1V2"
+        },
+        "trigger_type": {
+          "title": "Primary Trigger Type",
+          "type": "string",
+          "description": "The type of event that triggers the function.",
+          "enum": [
+            "http",
+            "timer",
+            "blob",
+            "queue",
+            "service_bus",
+            "event_hub",
+            "cosmos_db",
+            "table",
+            "storage_queue"
+          ]
+        },
+        "file_upload": {
+          "title": "Deployment Package",
+          "type": "array",
+          "description": "Azure Function Deployment Package (Upload ZIP to Storage)",
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "size": {
+                "type": "number"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "url",
+              "name",
+              "size",
+              "type"
+            ]
+          },
+          "default": []
+        },
+        "github_branch": {
+          "type": "object",
+          "title": "GitHub Source",
+          "properties": {
+            "repo": {
+              "type": "string"
+            },
+            "branch": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "repo",
+            "branch"
+          ]
+        },
+        "memory_mb": {
+          "title": "Memory (MB)",
+          "type": "integer",
+          "description": "The amount of memory allocated (for Premium/Dedicated plans).",
+          "default": 512,
+          "minimum": 128,
+          "maximum": 1024
+        },
+        "timeout_seconds": {
+          "title": "Timeout",
+          "type": "integer",
+          "description": "The maximum execution time in seconds.",
+          "default": 300,
+          "minimum": 1,
+          "maximum": 3600
+        },
+        "storage_account": {
+          "title": "Storage Account",
+          "type": "string",
+          "description": "The storage account name for function state and artifacts.",
+          "default": "myStorageAccount"
+        },
+        "environment": {
+          "title": "Environment Variables",
+          "type": "array",
+          "description": "Environment variables for the Azure Function.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "title": "Env Key",
+                "type": "string",
+                "description": "Variable key"
+              },
+              "value": {
+                "title": "Env Value",
+                "type": "string",
+                "description": "Variable value"
+              }
+            },
+            "required": [
+              "key",
+              "value"
+            ]
+          }
+        },
+        "vnet_integration": {
+          "title": "VNet Integration",
+          "type": "object",
+          "description": "Virtual Network integration configuration (Premium/Dedicated only).",
+          "properties": {
+            "enabled": {
+              "title": "Enable VNet Integration",
+              "type": "boolean",
+              "default": false
+            },
+            "vnet": {
+              "title": "Virtual Network",
+              "type": "string",
+              "description": "The name of the virtual network."
+            },
+            "subnet": {
+              "title": "Subnet",
+              "type": "string",
+              "description": "The subnet within the virtual network."
+            }
+          },
+          "additionalProperties": false
+        },
+        "tags": {
+          "title": "Tags",
+          "type": "array",
+          "description": "Tags to apply to the Function App.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "title": "Key",
+                "type": "string",
+                "description": "Tag key"
+              },
+              "value": {
+                "title": "Value",
+                "type": "string",
+                "description": "Tag value"
+              }
+            },
+            "required": [
+              "key",
+              "value"
+            ]
+          }
+        },
+        "storage_container": {
+          "type": "string"
+        },
+        "storage_key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "function_name",
+        "function_app_name",
+        "region",
+        "runtime",
+        "plan_type",
+        "trigger_type",
+        "storage_account"
+      ],
+      "additionalProperties": false
+    }
+  }
