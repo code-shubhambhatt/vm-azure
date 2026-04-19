@@ -1,0 +1,92 @@
+{
+  "serviceid": 1,
+  "serviceshortname": "azurevm",
+  "uischema": {
+    "ui:order": [
+      "region",
+      "operatingSystem",
+      "linuxType",
+      "tier",
+      "instanceSelector",
+      "addHybridBenefit",
+      "count",
+      "hours",
+      "managedDisk",
+      "dataTransfer",
+      "environment",
+      "tags"
+    ],
+    "region": {
+      "ui:help": "Select the Azure region to deploy your VM. Instance sizes shown below are filtered to only those available in this region."
+    },
+    "operatingSystem": {
+      "ui:help": "Select your preferred operating system for the VM."
+    },
+    "linuxType": {
+      "ui:help": "Choose your Linux distribution. Only applies when OS is Linux."
+    },
+    "instanceSelector": {
+      "ui:field": "AzureVMInstanceField",
+      "ui:options": {
+        "cascading": true,
+        "displaySpecs": true
+      }
+    },
+    "addHybridBenefit": {
+      "ui:help": "Apply existing Windows Server licenses to reduce costs. Windows OS only."
+    },
+    "count": {
+      "ui:help": "Total number of VM instances to deploy.",
+      "ui:widget": "updown"
+    },
+    "hours": {
+      "ui:help": "Average hours per month the VM will be running.",
+      "ui:widget": "updown"
+    },
+    "managedDisk": {
+      "ui:field": "managedDiskConfig",
+      "ui:options": {
+        "collapsible": true,
+        "collapsed": true
+      },
+      "tier": {
+        "ui:help": "Disk performance tier: standardhdd (cheapest), standardssd (balanced), premiumssd (high-performance)"
+      },
+      "size": {
+        "ui:help": "Managed disk size (e.g., e10 = 128GB, e20 = 512GB)"
+      },
+      "redundancy": {
+        "ui:help": "LRS: locally redundant, ZRS: zone-redundant (higher cost)"
+      }
+    },
+    "dataTransfer": {
+      "ui:field": "dataTransferConfig",
+      "ui:options": {
+        "collapsible": true,
+        "collapsed": true
+      },
+      "type": {
+        "ui:help": "internet-egress for outbound public internet, inter-region for cross-region traffic"
+      },
+      "routedVia": {
+        "ui:help": "premium: Microsoft backbone network, isp: public internet (cheaper but slower)"
+      }
+    },
+    "environment": {
+      "ui:field": "keyValuePairs",
+      "ui:options": {
+        "addable": true,
+        "removable": true,
+        "orderable": false
+      }
+    },
+    "tags": {
+      "ui:field": "keyValuePairs",
+      "ui:options": {
+        "addable": true,
+        "removable": true,
+        "orderable": false
+      }
+    }
+  }
+}

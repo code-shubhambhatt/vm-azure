@@ -1,0 +1,495 @@
+{
+  "serviceid": 1,
+  "serviceshortname": "azurevm",
+  "deploymentconfig": {
+    "title": "Azure Virtual Machines",
+    "type": "object",
+    "required": [
+      "region",
+      "operatingSystem",
+      "tier",
+      "instanceSelector",
+      "count",
+      "hours"
+    ],
+    "properties": {
+      "region": {
+        "title": "Region",
+        "type": "string",
+        "description": "Azure region to deploy the virtual machine.",
+        "default": "us-east",
+        "enum": [
+          "us-east",
+          "us-east-2",
+          "us-west",
+          "us-west-2",
+          "us-west-3",
+          "us-central",
+          "us-north-central",
+          "us-south-central",
+          "us-west-central",
+          "canada-east",
+          "canada-central",
+          "europe-north",
+          "europe-west",
+          "uk-south",
+          "uk-west",
+          "france-central",
+          "france-south",
+          "switzerland-north",
+          "switzerland-west",
+          "norway-east",
+          "norway-west",
+          "sweden-central",
+          "asia-pacific-east",
+          "asia-pacific-southeast",
+          "japan-east",
+          "japan-west",
+          "korea-central",
+          "korea-south",
+          "central-india",
+          "south-india",
+          "west-india",
+          "australia-east",
+          "australia-southeast",
+          "australia-central",
+          "australia-central-2",
+          "new-zealand-north",
+          "brazil-south",
+          "brazil-southeast",
+          "uae-north",
+          "uae-central",
+          "south-africa-north",
+          "south-africa-west",
+          "israel-central",
+          "qatar-central",
+          "germany-north",
+          "germany-west-central"
+        ],
+        "enumNames": [
+          "East US",
+          "East US 2",
+          "West US",
+          "West US 2",
+          "West US 3",
+          "Central US",
+          "North Central US",
+          "South Central US",
+          "West Central US",
+          "Canada East",
+          "Canada Central",
+          "North Europe",
+          "West Europe",
+          "UK South",
+          "UK West",
+          "France Central",
+          "France South",
+          "Switzerland North",
+          "Switzerland West",
+          "Norway East",
+          "Norway West",
+          "Sweden Central",
+          "East Asia",
+          "Southeast Asia",
+          "Japan East",
+          "Japan West",
+          "Korea Central",
+          "Korea South",
+          "Central India",
+          "South India",
+          "West India",
+          "Australia East",
+          "Australia Southeast",
+          "Australia Central",
+          "Australia Central 2",
+          "New Zealand North",
+          "Brazil South",
+          "Brazil Southeast",
+          "UAE North",
+          "UAE Central",
+          "South Africa North",
+          "South Africa West",
+          "Israel Central",
+          "Qatar Central",
+          "Germany North",
+          "Germany West Central"
+        ]
+      },
+      "operatingSystem": {
+        "title": "Operating System",
+        "type": "string",
+        "description": "Base OS for the virtual machine.",
+        "default": "linux",
+        "enum": [
+          "linux",
+          "windows"
+        ],
+        "enumNames": [
+          "Linux",
+          "Windows"
+        ]
+      },
+      "linuxType": {
+        "title": "Linux Distribution",
+        "type": "string",
+        "description": "Linux distribution or software variant. Only applicable when OS is Linux.",
+        "default": "ubuntu",
+        "enum": [
+          "ubuntu",
+          "ubuntu-pro",
+          "redhat",
+          "rhel-ha",
+          "rhel-sap-business",
+          "rhel-sap-ha",
+          "sles-enterprise",
+          "sles-hpc",
+          "sles-sap-priority"
+        ]
+      },
+      "tier": {
+        "title": "Tier",
+        "type": "string",
+        "description": "VM tier — Standard or Basic.",
+        "default": "standard",
+        "enum": [
+          "standard",
+          "basic"
+        ],
+        "enumNames": [
+          "Standard",
+          "Basic"
+        ]
+      },
+      "instanceSelector": {
+        "title": "Instance Selection",
+        "type": "object",
+        "description": "Select Azure VM instance size via category, series, and size filters. Sizes are filtered by the selected region.",
+        "properties": {
+          "category": {
+            "type": "string",
+            "title": "Category",
+            "description": "VM category (e.g., General Purpose, Compute Optimized)"
+          },
+          "series": {
+            "type": "string",
+            "title": "Series",
+            "description": "VM series (e.g., D-series, F-series)"
+          },
+          "instanceSize": {
+            "type": "string",
+            "title": "Instance Size",
+            "description": "VM instance size (e.g., Standard_D2s_v5)"
+          }
+        },
+        "required": [
+          "category",
+          "series",
+          "instanceSize"
+        ]
+      },
+      "addHybridBenefit": {
+        "title": "Azure Hybrid Benefit",
+        "type": "boolean",
+        "description": "Use existing Windows Server licenses to reduce cost. Windows only.",
+        "default": false
+      },
+      "count": {
+        "title": "VM Count",
+        "type": "integer",
+        "description": "Number of virtual machine instances.",
+        "default": 1,
+        "minimum": 1
+      },
+      "hours": {
+        "title": "Hours / Month",
+        "type": "number",
+        "description": "Estimated running hours per month.",
+        "default": 730,
+        "minimum": 1,
+        "maximum": 744
+      },
+      "managedDisk": {
+        "title": "Managed Disk Configuration",
+        "type": "object",
+        "description": "Optional managed disk attachment settings.",
+        "properties": {
+          "tier": {
+            "title": "Disk Tier",
+            "type": "string",
+            "default": "standardssd",
+            "enum": [
+              "standardhdd",
+              "standardssd",
+              "premiumssd"
+            ]
+          },
+          "size": {
+            "title": "Disk Size",
+            "type": "string",
+            "default": "e10",
+            "enum": [
+              "e1",
+              "e2",
+              "e3",
+              "e4",
+              "e6",
+              "e10",
+              "e15",
+              "e20",
+              "e30",
+              "e40",
+              "e50",
+              "e60",
+              "e70",
+              "e80"
+            ]
+          },
+          "redundancy": {
+            "title": "Redundancy",
+            "type": "string",
+            "default": "lrs",
+            "enum": [
+              "lrs",
+              "zrs"
+            ]
+          },
+          "count": {
+            "title": "Number of Disks",
+            "type": "integer",
+            "default": 0,
+            "minimum": 0,
+            "maximum": 64
+          }
+        }
+      },
+      "dataTransfer": {
+        "title": "Data Transfer Configuration",
+        "type": "object",
+        "description": "Optional data transfer and bandwidth settings.",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "type": {
+            "title": "Transfer Type",
+            "type": "string",
+            "default": "internet-egress",
+            "enum": [
+              "internet-egress",
+              "inter-region"
+            ]
+          },
+          "sourceRegion": {
+            "title": "Source Region",
+            "type": "string",
+            "description": "For inter-region transfers."
+          },
+          "destinationRegion": {
+            "title": "Destination Region",
+            "type": "string",
+            "description": "For inter-region transfers."
+          },
+          "routedVia": {
+            "title": "Route",
+            "type": "string",
+            "default": "premium",
+            "enum": [
+              "premium",
+              "isp"
+            ],
+            "description": "For internet egress only."
+          },
+          "gigabytesPerMonth": {
+            "title": "Data Transfer (GB/Month)",
+            "type": "number",
+            "default": 0,
+            "minimum": 0
+          }
+        }
+      },
+      "environment": {
+        "title": "Environment Variables",
+        "type": "array",
+        "description": "Optional environment variables for the VM.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "title": "Variable Name",
+              "type": "string"
+            },
+            "value": {
+              "title": "Variable Value",
+              "type": "string"
+            }
+          },
+          "required": [
+            "key",
+            "value"
+          ]
+        },
+        "default": []
+      },
+      "tags": {
+        "title": "Tags",
+        "type": "array",
+        "description": "Optional tags to apply to the virtual machine.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "title": "Tag Key",
+              "type": "string"
+            },
+            "value": {
+              "title": "Tag Value",
+              "type": "string"
+            }
+          },
+          "required": [
+            "key",
+            "value"
+          ]
+        },
+        "default": []
+      },
+      "backupConfiguration": {
+        "type": "object",
+        "title": "Backup Configuration",
+        "description": "Configure backup and disaster recovery settings.",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enable Backup",
+            "default": false
+          },
+          "backupFrequency": {
+            "type": "string",
+            "title": "Backup Frequency",
+            "enum": [
+              "hourly",
+              "daily",
+              "weekly",
+              "monthly"
+            ]
+          },
+          "retentionDays": {
+            "type": "integer",
+            "title": "Retention Days",
+            "minimum": 1,
+            "maximum": 3650,
+            "default": 30
+          }
+        },
+        "required": [
+          "enabled",
+          "backupFrequency",
+          "retentionDays"
+        ]
+      },
+      "monitoringConfiguration": {
+        "type": "object",
+        "title": "Monitoring & Diagnostics",
+        "description": "Configure Azure Monitor and diagnostic settings.",
+        "properties": {
+          "enableDiagnostics": {
+            "type": "boolean",
+            "title": "Enable Diagnostics",
+            "default": true
+          },
+          "enableMetrics": {
+            "type": "boolean",
+            "title": "Enable Metrics Collection",
+            "default": true
+          },
+          "logRetentionDays": {
+            "type": "integer",
+            "title": "Log Retention (Days)",
+            "minimum": 0,
+            "maximum": 730,
+            "default": 30
+          },
+          "alertEmail": {
+            "type": "string",
+            "title": "Alert Email Address",
+            "format": "email"
+          }
+        },
+        "required": [
+          "enableDiagnostics",
+          "enableMetrics",
+          "logRetentionDays"
+        ]
+      },
+      "customImage": {
+        "type": "object",
+        "title": "Custom Image Configuration",
+        "description": "Use a custom or marketplace image instead of standard Azure images.",
+        "properties": {
+          "imagePublisher": {
+            "type": "string",
+            "title": "Image Publisher",
+            "description": "e.g., Canonical, MicrosoftWindowsServer"
+          },
+          "imageOffer": {
+            "type": "string",
+            "title": "Image Offer",
+            "description": "e.g., UbuntuServer, WindowsServer"
+          },
+          "imageSKU": {
+            "type": "string",
+            "title": "Image SKU",
+            "description": "e.g., 22.04-LTS, 2022-Datacenter"
+          },
+          "imageVersion": {
+            "type": "string",
+            "title": "Image Version",
+            "default": "latest"
+          }
+        },
+        "required": [
+          "imagePublisher",
+          "imageOffer",
+          "imageSKU"
+        ]
+      },
+      "advancedNetworking": {
+        "type": "object",
+        "title": "Advanced Networking",
+        "description": "Configure advanced networking features and security.",
+        "properties": {
+          "acceleratedNetworking": {
+            "type": "boolean",
+            "title": "Accelerated Networking",
+            "description": "Enable SR-IOV for enhanced network performance.",
+            "default": false
+          },
+          "publicIpAddress": {
+            "type": "boolean",
+            "title": "Public IP Address",
+            "default": true
+          },
+          "nsgName": {
+            "type": "string",
+            "title": "Network Security Group Name",
+            "description": "Attach an existing NSG to the VM."
+          },
+          "privateIpAllocationMethod": {
+            "type": "string",
+            "title": "Private IP Allocation",
+            "enum": [
+              "Static",
+              "Dynamic"
+            ],
+            "default": "Dynamic"
+          }
+        },
+        "required": [
+          "acceleratedNetworking",
+          "publicIpAddress"
+        ]
+      }
+    }
+  }
+}
