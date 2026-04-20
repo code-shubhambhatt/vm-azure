@@ -465,34 +465,20 @@ def _calc_vm(fd, calc_data, region):
 
 # ── Instance Selector — MongoDB-backed endpoints ──────────────────────────────
 
-@ns.route("/instances/regions")
-class InstanceRegions(Resource):
-    def get(self):
-        """Return all Azure regions from VM metadata (slug + displayName)."""
-        meta, err = _fetch_vm_metadata()
-        if err:
-            return {"error": f"Azure metadata error: {err}"}, 502
-        regions = meta.get("regions", [])
-        return {
-            "regions": [
-                {"slug": r["slug"], "display": r["displayName"]}
-                for r in regions
-                if r.get("slug")
-            ]
-        }
-
-
 @ns.route("/instances/categories")
 class InstanceCategories(Resource):
     def get(self):
-        """Return all distinct VM categories stored in MongoDB."""
+        """
+        Return all distinct VM categories.
+        Categories are global (not region-filtered) — every category exists
+        in every major region so filtering here adds overhead with no UX benefit.
+        """
         try:
             col = _get_collection()
-            # Use aggregation to get unique category + category_display pairs, sorted.
             pipeline = [
                 {"$match": {"provider": "azure"}},
                 {"$group": {
-                    "_id": "$category",
+                    "_id":     "$category",
                     "display": {"$first": "$category_display"},
                 }},
                 {"$sort": {"_id": 1}},
@@ -511,17 +497,25 @@ class InstanceCategories(Resource):
 @ns.route("/instances/series")
 class InstanceSeries(Resource):
     def get(self):
-        """Return distinct series, optionally filtered by ?category=<slug>."""
+        """
+        Return distinct series available in a given region + category.
+        ?region=   (required for region-aware filtering)
+        ?category= (required)
+        Both params are required for meaningful results; falls back gracefully if omitted.
+        """
         try:
             col      = _get_collection()
+            region   = request.args.get("region",   "").strip()
             category = request.args.get("category", "").strip()
             match    = {"provider": "azure"}
+            if region:
+                match["region"] = region
             if category:
                 match["category"] = category
             pipeline = [
                 {"$match": match},
                 {"$group": {
-                    "_id": "$series",
+                    "_id":     "$series",
                     "display": {"$first": "$series_display"},
                 }},
                 {"$sort": {"_id": 1}},
@@ -541,29 +535,33 @@ class InstanceSeries(Resource):
 class InstanceSizes(Resource):
     def get(self):
         """
-        Return instance sizes, optionally filtered by ?category=, ?series=, and/or ?region=.
-        When ?region= is provided, only instances available in that region are returned.
-        Each item includes slug, displayName, and optional vcpus/ram for rich labels.
+        Return instance sizes for a given region + category + series.
+        This is now a single document point-lookup — O(1) after index.
+        ?region=   (required)
+        ?category= (required)
+        ?series=   (required)
         """
         try:
             col      = _get_collection()
+            region   = request.args.get("region",   "").strip()
             category = request.args.get("category", "").strip()
             series   = request.args.get("series",   "").strip()
-            region   = request.args.get("region",   "").strip()
-            match    = {"provider": "azure"}
-            if category:
-                match["category"] = category
-            if series:
-                match["series"] = series
-            if region:
-                match["available_regions"] = {"$in": [region]}
-            docs = list(
-                col.find(
-                    match,
-                    {"_id": 0, "slug": 1, "displayName": 1, "vcpus": 1, "ram": 1},
-                ).sort("slug", 1)
+
+            if not region or not category or not series:
+                return {"error": "region, category, and series are all required"}, 400
+
+            doc = col.find_one(
+                {
+                    "provider": "azure",
+                    "region":   region,
+                    "category": category,
+                    "series":   series,
+                },
+                {"_id": 0, "instances": 1},
             )
-            return {"sizes": docs}
+            if not doc:
+                return {"sizes": []}
+            return {"sizes": doc.get("instances", [])}
         except Exception as e:
             return {"error": str(e)}, 500
 

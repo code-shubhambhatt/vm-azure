@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FieldProps } from '@rjsf/utils';
 import axios from '@/utils/axios';
 
@@ -35,6 +35,10 @@ const AzureVMInstanceField: React.FC<FieldProps<VMInstanceData>> = (props) => {
   // Region comes from the parent form via formContext — no local state needed.
   const region: string = formContext?.region || 'us-east';
 
+  // Track previous region so we only react to genuine region changes,
+  // not spurious re-renders where formContext object reference changes.
+  const prevRegionRef = useRef<string>(region);
+
   // ── State ──────────────────────────────────────────────────────────────────
   const [categories,    setCategories]    = useState<Category[]>([]);
   const [seriesList,    setSeriesList]    = useState<Series[]>([]);
@@ -60,17 +64,22 @@ const AzureVMInstanceField: React.FC<FieldProps<VMInstanceData>> = (props) => {
     fetchCategories();
   }, []);
 
-  // ── Re-fetch sizes when parent region changes ──────────────────────────────
+  // ── Re-fetch series + sizes when parent region genuinely changes ──────────
   useEffect(() => {
-    if (selectedCat && selectedSeries) {
-      fetchSizes(selectedCat, selectedSeries, region);
+    if (prevRegionRef.current === region) return;   // same region — skip
+    prevRegionRef.current = region;
+    if (selectedCat) {
+      setSelectedSeries('');
+      setSizes([]);
+      setSelectedSize('');
+      fetchSeries(selectedCat, region);
     }
   }, [region]);
 
   // ── Cascade: category change → fetch series ────────────────────────────────
   useEffect(() => {
     if (selectedCat) {
-      fetchSeries(selectedCat);
+      fetchSeries(selectedCat, region);
     } else {
       setSeriesList([]);
       setSelectedSeries('');
@@ -88,7 +97,6 @@ const AzureVMInstanceField: React.FC<FieldProps<VMInstanceData>> = (props) => {
       setSelectedSize('');
     }
   }, [selectedSeries]);
-
   // ── API calls ──────────────────────────────────────────────────────────────
 
   const fetchCategories = async (): Promise<void> => {
@@ -104,11 +112,13 @@ const AzureVMInstanceField: React.FC<FieldProps<VMInstanceData>> = (props) => {
     }
   };
 
-  const fetchSeries = async (category: string): Promise<void> => {
+  const fetchSeries = async (category: string, region: string): Promise<void> => {
     setLoadingSeries(true);
     setError(null);
     try {
-      const res = await axios.get(`/api/vm/instances/series?category=${encodeURIComponent(category)}`);
+      const res = await axios.get(
+        `/api/vm/instances/series?category=${encodeURIComponent(category)}&region=${encodeURIComponent(region)}`
+      );
       setSeriesList(res.data.series || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load series');
@@ -173,7 +183,7 @@ const AzureVMInstanceField: React.FC<FieldProps<VMInstanceData>> = (props) => {
     if (!selectedCat) {
       fetchCategories();
     } else if (!selectedSeries) {
-      fetchSeries(selectedCat);
+      fetchSeries(selectedCat, region);
     } else {
       fetchSizes(selectedCat, selectedSeries, region);
     }
