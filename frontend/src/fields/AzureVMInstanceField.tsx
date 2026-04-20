@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { FieldProps } from '@rjsf/utils';
 import axios from '@/utils/axios';
+import { VMFormDataContext } from '../App';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -32,8 +33,15 @@ interface VMInstanceData {
 const AzureVMInstanceField: React.FC<FieldProps<VMInstanceData>> = (props) => {
   const { formData, onChange, name, required, formContext } = props;
 
-  // Region comes from the parent form via formContext — no local state needed.
-  const region: string = formContext?.region || 'us-east';
+  // Get full form data from context
+  const parentFormData = useContext(VMFormDataContext);
+  
+  console.log("📦 AzureVMInstanceField - formData:", formData);
+  console.log("📦 AzureVMInstanceField - parentFormData from context:", parentFormData);
+  console.log("📦 AzureVMInstanceField - formContext:", formContext);
+
+  // Region comes from the parent form via context
+  const region: string = parentFormData?.region || 'us-east';
 
   // Track previous region so we only react to genuine region changes,
   // not spurious re-renders where formContext object reference changes.
@@ -153,7 +161,23 @@ const AzureVMInstanceField: React.FC<FieldProps<VMInstanceData>> = (props) => {
   // ── rjsf onChange contract ─────────────────────────────────────────────────
 
   const notifyChange = (category: string, series: string, instanceSize: string): void => {
-    onChange({ category, series, instanceSize });
+    // CRITICAL: Pass the ENTIRE parent form data back, with updated instanceSelector.
+    // Use data from context to ensure we preserve all fields like region.
+    const fullFormData = parentFormData ? {
+      ...parentFormData,
+      instanceSelector: { 
+        category, 
+        series, 
+        instanceSize 
+      }
+    } : { 
+      category, 
+      series, 
+      instanceSize 
+    };
+    console.log("📦 notifyChange sending full formData:", fullFormData);
+    console.log("📦 notifyChange - region:", fullFormData?.region);
+    onChange(fullFormData);
   };
 
   // ── Handlers ──────────────────────────────────────────────────────────────

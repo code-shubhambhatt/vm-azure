@@ -1,9 +1,12 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, createContext } from "react";
 import Form from "@rjsf/core";
 import validator from "@rjsf/validator-ajv8";
 import AzureVMInstanceField from "./fields/AzureVMInstanceField";
 
 const API = "http://localhost:5000/api";
+
+// ── Create context for passing full form data to custom fields ────────────────
+export const VMFormDataContext = createContext(null);
 
 const S = {
   app: {
@@ -287,19 +290,33 @@ function VMCalculator() {
   useEffect(() => { fetchSchema(region, os, linuxType, tier); }, []);
 
   const handleChange = ({ formData: fd }) => {
-    const normalized = normalizeVMFormData(fd);
+    // Merge incoming data with existing formData to preserve fields not in fd
+    const merged = { ...formData, ...fd };
+    console.log("🔧 handleChange - incoming fd:", fd);
+    console.log("🔧 handleChange - merged:", merged);
+    console.log("🔧 handleChange - formData region:", formData?.region);
+    
+    const normalized = normalizeVMFormData(merged);
+    console.log("🔧 handleChange - normalized:", normalized);
+    
     const next = {
       ...normalized,
+      region: normalized?.region || merged?.region || formData?.region || region,
       count: normalized?.count ?? formData.count ?? schema?.properties?.count?.default ?? 1,
       hours: normalized?.hours ?? formData.hours ?? schema?.properties?.hours?.default ?? 730,
       addHybridBenefit: normalized?.addHybridBenefit ?? formData.addHybridBenefit ?? ahb,
     };
+    console.log("🔧 handleChange - next (final):", next);
+    console.log("🔧 handleChange - next.region:", next.region);
+    
     setFormData(next); setVmResult(null);
     const nr  = next.region          || region;
     const no  = next.operatingSystem || os;
     const nlt = next.linuxType       || linuxType;
     const nt  = next.tier            || tier;
+    console.log("🔧 handleChange - checking schema refetch. nr:", nr, "region:", region, "changed?", nr !== region);
     if (nr !== region || no !== os || nlt !== linuxType || nt !== tier) {
+      console.log("🔧 handleChange - refetching schema");
       setRegion(nr); setOs(no); setLinuxType(nlt); setTier(nt);
       fetchSchema(nr, no, nlt, nt, next);
     }
@@ -381,19 +398,25 @@ function VMCalculator() {
                 </div>
               </div>
             )}
-            <Form
-              schema={rjsfSchema}
-              uiSchema={UI_VM}
-              fields={CUSTOM_FIELDS}
-              formData={formData}
-              onChange={handleChange}
-              validator={validator}
-              onSubmit={handleCalculate}
-            >
-              <button type="submit" style={S.calcBtn(calculating)} disabled={calculating}>
-                {calculating ? "Calculating…" : "Calculate VM Cost →"}
-              </button>
-            </Form>
+            <VMFormDataContext.Provider value={formData}>
+              <Form
+                schema={rjsfSchema}
+                uiSchema={UI_VM}
+                fields={CUSTOM_FIELDS}
+                formData={formData}
+                formContext={{ 
+                  region: formData?.region || region,
+                  parentFormData: formData 
+                }}
+                onChange={handleChange}
+                validator={validator}
+                onSubmit={handleCalculate}
+              >
+                <button type="submit" style={S.calcBtn(calculating)} disabled={calculating}>
+                  {calculating ? "Calculating…" : "Calculate VM Cost →"}
+                </button>
+              </Form>
+            </VMFormDataContext.Provider>
           </>
         )}
         {vmResult && (
