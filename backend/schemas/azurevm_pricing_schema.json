@@ -1,0 +1,442 @@
+{
+  "serviceid": 4,
+  "serviceshortname": "azurevm-pricing",
+  "pricingconfig": {
+    "title": "Azure Virtual Machines Pricing Calculator",
+    "type": "object",
+    "required": [
+      "region",
+      "operatingSystem",
+      "tier",
+      "instanceSelector",
+      "count",
+      "hours"
+    ],
+    "properties": {
+      "region": {
+        "title": "Region",
+        "type": "string",
+        "description": "Azure region where the virtual machine will be deployed. Available instance categories, series, and sizes are filtered by region.",
+        "enum": [
+          "us-east",
+          "us-east-2",
+          "us-west",
+          "us-west-2",
+          "us-west-3",
+          "us-central",
+          "us-north-central",
+          "us-south-central",
+          "us-west-central",
+          "canada-east",
+          "canada-central",
+          "europe-north",
+          "europe-west",
+          "uk-south",
+          "uk-west",
+          "france-central",
+          "france-south",
+          "switzerland-north",
+          "switzerland-west",
+          "norway-east",
+          "norway-west",
+          "sweden-central",
+          "asia-pacific-east",
+          "asia-pacific-southeast",
+          "japan-east",
+          "japan-west",
+          "korea-central",
+          "korea-south",
+          "central-india",
+          "south-india",
+          "west-india",
+          "australia-east",
+          "australia-southeast",
+          "australia-central",
+          "australia-central-2",
+          "new-zealand-north",
+          "brazil-south",
+          "brazil-southeast",
+          "uae-north",
+          "uae-central",
+          "south-africa-north",
+          "south-africa-west",
+          "israel-central",
+          "qatar-central",
+          "germany-north",
+          "germany-west-central"
+        ],
+        "enumNames": [
+          "East US",
+          "East US 2",
+          "West US",
+          "West US 2",
+          "West US 3",
+          "Central US",
+          "North Central US",
+          "South Central US",
+          "West Central US",
+          "Canada East",
+          "Canada Central",
+          "North Europe",
+          "West Europe",
+          "UK South",
+          "UK West",
+          "France Central",
+          "France South",
+          "Switzerland North",
+          "Switzerland West",
+          "Norway East",
+          "Norway West",
+          "Sweden Central",
+          "East Asia",
+          "Southeast Asia",
+          "Japan East",
+          "Japan West",
+          "Korea Central",
+          "Korea South",
+          "Central India",
+          "South India",
+          "West India",
+          "Australia East",
+          "Australia Southeast",
+          "Australia Central",
+          "Australia Central 2",
+          "New Zealand North",
+          "Brazil South",
+          "Brazil Southeast",
+          "UAE North",
+          "UAE Central",
+          "South Africa North",
+          "South Africa West",
+          "Israel Central",
+          "Qatar Central",
+          "Germany North",
+          "Germany West Central"
+        ],
+        "default": "us-east"
+      },
+      "operatingSystem": {
+        "title": "Operating System",
+        "type": "string",
+        "description": "Base operating system for the virtual machine. Windows pricing can include license charges unless Azure Hybrid Benefit is selected.",
+        "enum": [
+          "linux",
+          "windows"
+        ],
+        "enumNames": [
+          "Linux",
+          "Windows"
+        ],
+        "default": "linux"
+      },
+      "linuxType": {
+        "title": "Linux Type",
+        "type": "string",
+        "description": "Linux distribution or software variant. Only applicable when Operating System is Linux.",
+        "enum": [
+          "ubuntu",
+          "ubuntu-pro",
+          "redhat",
+          "rhel-ha",
+          "rhel-sap-business",
+          "rhel-sap-ha",
+          "sles-enterprise",
+          "sles-hpc",
+          "sles-sap-priority",
+          "sql-redhat",
+          "sql-sles-priority",
+          "sql-linux",
+          "sql-ubuntu-pro",
+          "ubuntu-advantage"
+        ],
+        "enumNames": [
+          "Ubuntu",
+          "Ubuntu Pro",
+          "Red Hat Enterprise Linux",
+          "RHEL HA",
+          "RHEL SAP Business Apps",
+          "RHEL SAP HA",
+          "SUSE Linux Enterprise",
+          "SUSE Linux HPC",
+          "SUSE Linux SAP Priority",
+          "SQL Server on Red Hat",
+          "SQL Server on SUSE",
+          "SQL Server on Linux",
+          "SQL Server on Ubuntu Pro",
+          "Ubuntu Advantage"
+        ],
+        "default": "ubuntu"
+      },
+      "tier": {
+        "title": "Tier",
+        "type": "string",
+        "description": "Azure VM tier used to filter available instance sizes and calculate hourly pricing.",
+        "enum": [
+          "standard",
+          "basic"
+        ],
+        "enumNames": [
+          "Standard",
+          "Basic"
+        ],
+        "default": "standard"
+      },
+      "instanceSelector": {
+        "title": "Instance Selection",
+        "type": "object",
+        "description": "Select the Azure VM instance size using category, series, and size filters. The custom UI field loads options from VM instance endpoints.",
+        "required": [
+          "category",
+          "series",
+          "instanceSize"
+        ],
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string",
+            "description": "VM category selected by the custom instance picker."
+          },
+          "series": {
+            "title": "Series",
+            "type": "string",
+            "description": "VM series selected by the custom instance picker."
+          },
+          "instanceSize": {
+            "title": "Instance Size",
+            "type": "string",
+            "description": "Azure VM instance size slug used by backend pricing calculation."
+          }
+        }
+      },
+      "count": {
+        "title": "VM Count",
+        "type": "integer",
+        "description": "Number of virtual machine instances to price.",
+        "minimum": 1,
+        "default": 1
+      },
+      "hours": {
+        "title": "Hours / Month",
+        "type": "number",
+        "description": "Average hours per month the virtual machine will be running.",
+        "minimum": 1,
+        "maximum": 744,
+        "default": 730
+      },
+      "addHybridBenefit": {
+        "title": "Azure Hybrid Benefit",
+        "type": "boolean",
+        "description": "Apply existing Windows Server or SQL Server licenses. Only applicable when Operating System is Windows.",
+        "default": false
+      },
+      "managedDisks": {
+        "title": "Managed Disks",
+        "type": "object",
+        "description": "Optional managed disk pricing. Field names match the VM managed-disks pricing endpoint.",
+        "properties": {
+          "enabled": {
+            "title": "Enable Managed Disks",
+            "type": "boolean",
+            "default": false
+          },
+          "diskTier": {
+            "title": "Disk Tier",
+            "type": "string",
+            "enum": [
+              "standardhdd",
+              "standardssd",
+              "premiumssd"
+            ],
+            "enumNames": [
+              "Standard HDD",
+              "Standard SSD",
+              "Premium SSD"
+            ],
+            "default": "standardssd"
+          },
+          "redundancy": {
+            "title": "Redundancy",
+            "type": "string",
+            "enum": [
+              "lrs",
+              "zrs"
+            ],
+            "enumNames": [
+              "LRS",
+              "ZRS"
+            ],
+            "default": "lrs"
+          },
+          "diskSize": {
+            "title": "Disk Size",
+            "type": "string",
+            "enum": [
+              "s4",
+              "s6",
+              "s10",
+              "s15",
+              "s20",
+              "s30",
+              "s40",
+              "s50",
+              "s60",
+              "s70",
+              "s80",
+              "e1",
+              "e2",
+              "e3",
+              "e4",
+              "e6",
+              "e10",
+              "e15",
+              "e20",
+              "e30",
+              "e40",
+              "e50",
+              "e60",
+              "e70",
+              "e80",
+              "p1",
+              "p2",
+              "p3",
+              "p4",
+              "p6",
+              "p10",
+              "p15",
+              "p20",
+              "p30",
+              "p40",
+              "p50",
+              "p60",
+              "p70",
+              "p80"
+            ],
+            "enumNames": [
+              "S4: 32 GiB",
+              "S6: 64 GiB",
+              "S10: 128 GiB",
+              "S15: 256 GiB",
+              "S20: 512 GiB",
+              "S30: 1 TiB",
+              "S40: 2 TiB",
+              "S50: 4 TiB",
+              "S60: 8 TiB",
+              "S70: 16 TiB",
+              "S80: 32 TiB",
+              "E1: 4 GiB",
+              "E2: 8 GiB",
+              "E3: 16 GiB",
+              "E4: 32 GiB",
+              "E6: 64 GiB",
+              "E10: 128 GiB",
+              "E15: 256 GiB",
+              "E20: 512 GiB",
+              "E30: 1 TiB",
+              "E40: 2 TiB",
+              "E50: 4 TiB",
+              "E60: 8 TiB",
+              "E70: 16 TiB",
+              "E80: 32 TiB",
+              "P1: 4 GiB",
+              "P2: 8 GiB",
+              "P3: 16 GiB",
+              "P4: 32 GiB",
+              "P6: 64 GiB",
+              "P10: 128 GiB",
+              "P15: 256 GiB",
+              "P20: 512 GiB",
+              "P30: 1 TiB",
+              "P40: 2 TiB",
+              "P50: 4 TiB",
+              "P60: 8 TiB",
+              "P70: 16 TiB",
+              "P80: 32 TiB"
+            ],
+            "default": "e10"
+          },
+          "count": {
+            "title": "Number of Disks",
+            "type": "integer",
+            "minimum": 1,
+            "default": 1
+          }
+        }
+      },
+      "storageTransactions": {
+        "title": "Storage Transactions",
+        "type": "object",
+        "description": "Optional transaction pricing for Standard HDD and Standard SSD managed disks. Premium SSD does not incur transaction charges.",
+        "properties": {
+          "enabled": {
+            "title": "Enable Storage Transactions",
+            "type": "boolean",
+            "default": false
+          },
+          "transactionUnits": {
+            "title": "Transaction Units",
+            "type": "number",
+            "description": "Number of transaction units, where 1 unit equals 10,000 transactions.",
+            "minimum": 0,
+            "default": 0
+          }
+        }
+      },
+      "bandwidth": {
+        "title": "Bandwidth",
+        "type": "object",
+        "description": "Optional outbound data transfer pricing for internet egress or inter-region traffic.",
+        "properties": {
+          "enabled": {
+            "title": "Enable Bandwidth",
+            "type": "boolean",
+            "default": false
+          },
+          "dataTransferType": {
+            "title": "Data Transfer Type",
+            "type": "string",
+            "enum": [
+              "interregion",
+              "internetegress"
+            ],
+            "enumNames": [
+              "Inter Region",
+              "Internet Egress"
+            ],
+            "default": "interregion"
+          },
+          "sourceRegion": {
+            "title": "Source Region",
+            "type": "string",
+            "description": "Azure region where outbound traffic originates.",
+            "default": "us-east"
+          },
+          "destinationRegion": {
+            "title": "Destination Region",
+            "type": "string",
+            "description": "Destination Azure region for inter-region transfers.",
+            "default": "asia-pacific-east"
+          },
+          "routedVia": {
+            "title": "Routed Via",
+            "type": "string",
+            "enum": [
+              "premium",
+              "isp"
+            ],
+            "enumNames": [
+              "Microsoft Global Network",
+              "Public Internet"
+            ],
+            "default": "premium"
+          },
+          "egressGB": {
+            "title": "Outbound Data Transfer (GB)",
+            "type": "number",
+            "minimum": 0,
+            "default": 5
+          }
+        }
+      }
+    }
+  }
+}

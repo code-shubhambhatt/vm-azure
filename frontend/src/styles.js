@@ -1,0 +1,77 @@
+export const S = {
+  app: {
+    fontFamily: "'Segoe UI', system-ui, sans-serif",
+    maxWidth: 880, margin: "0 auto", padding: "24px 20px",
+    background: "#f6f8fc", minHeight: "100vh", color: "#1a1a2e",
+  },
+  header: { marginBottom: 24 },
+  title: { fontSize: 22, fontWeight: 600, color: "#0078d4", margin: 0 },
+  sub: { fontSize: 13, color: "#888", marginTop: 4 },
+  serviceRow: { display: "flex", gap: 8, marginBottom: 20 },
+  svcBtn: (active) => ({
+    padding: "9px 22px", borderRadius: 20, cursor: "pointer", fontSize: 14,
+    fontWeight: active ? 600 : 400, transition: "all 0.15s",
+    border: active ? "1.5px solid #0078d4" : "1.5px solid #d0d7e0",
+    background: active ? "#e6f2fd" : "#fff", color: active ? "#0078d4" : "#555",
+  }),
+  card: {
+    background: "#fff", border: "1px solid #e0e7ef", borderRadius: 8,
+    padding: "20px 24px", marginBottom: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+  },
+  secTitle: {
+    fontSize: 11, fontWeight: 600, color: "#0078d4", textTransform: "uppercase",
+    letterSpacing: "0.06em", marginBottom: 14, marginTop: 0,
+  },
+  tierBtn: (active) => ({
+    padding: "7px 16px", borderRadius: 20, cursor: "pointer", fontSize: 13,
+    fontWeight: active ? 600 : 400,
+    border: active ? "1.5px solid #0078d4" : "1.5px solid #d0d7e0",
+    background: active ? "#e6f2fd" : "#fff", color: active ? "#0078d4" : "#555",
+  }),
+  calcBtn: (loading) => ({
+    background: loading ? "#aac8e8" : "#0078d4", color: "#fff",
+    border: "none", borderRadius: 6, padding: "10px 24px",
+    fontSize: 14, fontWeight: 600, cursor: loading ? "not-allowed" : "pointer", marginTop: 8,
+  }),
+  result: {
+    background: "linear-gradient(135deg, #0078d4, #005fa3)",
+    borderRadius: 8, padding: "20px 24px", color: "#fff", marginTop: 16,
+  },
+  resultLabel: { fontSize: 13, opacity: 0.85, marginBottom: 6 },
+  resultAmount: { fontSize: 36, fontWeight: 700, margin: 0, letterSpacing: "-0.5px" },
+  resultSub: { fontSize: 12, opacity: 0.75, marginTop: 4 },
+  error: {
+    background: "#fef0f0", border: "1px solid #fca5a5", borderRadius: 6,
+    padding: "10px 14px", color: "#b91c1c", fontSize: 13, marginTop: 10,
+  },
+  loading: { padding: "32px 0", textAlign: "center", color: "#888", fontSize: 14 },
+  radioRow: { display: "flex", gap: 12, marginBottom: 16, alignItems: "center", flexWrap: "wrap" },
+  radioLabel: (active) => ({
+    display: "flex", alignItems: "center", gap: 6, cursor: "pointer",
+    padding: "6px 14px", borderRadius: 16, fontSize: 13,
+    border: active ? "1.5px solid #0078d4" : "1.5px solid #d0d7e0",
+    background: active ? "#e6f2fd" : "#fff", color: active ? "#0078d4" : "#555",
+    fontWeight: active ? 600 : 400,
+  }),
+  addOnHeader: {
+    fontSize: 13, fontWeight: 600, color: "#555", textTransform: "uppercase",
+    letterSpacing: "0.05em", margin: "24px 0 12px",
+    borderBottom: "1px solid #e0e7ef", paddingBottom: 8,
+  },
+  totalCard: {
+    background: "linear-gradient(135deg, #0078d4, #005fa3)",
+    borderRadius: 8, padding: "20px 24px", color: "#fff", marginTop: 8,
+  },
+  totalRow: { display: "flex", justifyContent: "space-between", fontSize: 14, opacity: 0.9, marginBottom: 6 },
+  totalAmount: { fontSize: 36, fontWeight: 700, margin: "8px 0 0", letterSpacing: "-0.5px" },
+  premiumNote: { fontSize: 12, color: "#666", fontStyle: "italic", padding: "8px 0" },
+  infoNote: {
+    fontSize: 12, color: "#555", background: "#f0f7ff",
+    border: "1px solid #c0dcf5", borderRadius: 5,
+    padding: "8px 12px", marginBottom: 12,
+  },
+  breakdownTable: { width: "100%", borderCollapse: "collapse", marginTop: 10, fontSize: 13 },
+  breakdownRow: { borderBottom: "1px solid rgba(255,255,255,0.15)" },
+  breakdownCell: { padding: "5px 0", opacity: 0.85 },
+  breakdownCellRight: { padding: "5px 0", textAlign: "right", opacity: 0.85 },
+};

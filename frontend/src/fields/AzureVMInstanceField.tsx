@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import { FieldProps } from '@rjsf/utils';
 import axios from '@/utils/axios';
-import { VMFormDataContext } from '../App';
-
-// ── Types ─────────────────────────────────────────────────────────────────────
+import { VMFormDataContext } from '../VMFormDataContext';
 
 interface Category {
   slug: string;
@@ -28,106 +26,91 @@ interface VMInstanceData {
   instanceSize: string;
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
-
 const AzureVMInstanceField: React.FC<FieldProps<VMInstanceData>> = (props) => {
-  const { formData, onChange, name, required, formContext } = props;
-
-  // Get full form data from context
+  const { formData, onChange, name, required } = props;
   const parentFormData = useContext(VMFormDataContext);
-  
-  console.log("📦 AzureVMInstanceField - formData:", formData);
-  console.log("📦 AzureVMInstanceField - parentFormData from context:", parentFormData);
-  console.log("📦 AzureVMInstanceField - formContext:", formContext);
 
-  // Region comes from the parent form via context
-  const region: string = parentFormData?.region || 'us-east';
+  const region = parentFormData?.region || 'us-east';
+  const operatingSystem = parentFormData?.operatingSystem || 'linux';
+  const linuxType = parentFormData?.linuxType || 'ubuntu';
+  const tier = parentFormData?.tier || 'standard';
 
-  // Track previous region so we only react to genuine region changes,
-  // not spurious re-renders where formContext object reference changes.
-  const prevRegionRef = useRef<string>(region);
+  const didMountRef = useRef(false);
+  const resettingRef = useRef(false);
 
-  // ── State ──────────────────────────────────────────────────────────────────
-  const [categories,    setCategories]    = useState<Category[]>([]);
-  const [seriesList,    setSeriesList]    = useState<Series[]>([]);
-  const [sizes,         setSizes]         = useState<InstanceSize[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [seriesList, setSeriesList] = useState<Series[]>([]);
+  const [sizes, setSizes] = useState<InstanceSize[]>([]);
 
-  const [selectedCat,   setSelectedCat]   = useState<string>(formData?.category     || '');
-  const [selectedSeries,setSelectedSeries]= useState<string>(formData?.series       || '');
-  const [selectedSize,  setSelectedSize]  = useState<string>(formData?.instanceSize || '');
+  const [selectedCat, setSelectedCat] = useState<string>(formData?.category || '');
+  const [selectedSeries, setSelectedSeries] = useState<string>(formData?.series || '');
+  const [selectedSize, setSelectedSize] = useState<string>(formData?.instanceSize || '');
 
-  const [loadingCats,   setLoadingCats]   = useState<boolean>(false);
-  const [loadingSeries, setLoadingSeries] = useState<boolean>(false);
-  const [loadingSizes,  setLoadingSizes]  = useState<boolean>(false);
-  const [error,         setError]         = useState<string | null>(null);
+  const [loadingCats, setLoadingCats] = useState(false);
+  const [loadingSeries, setLoadingSeries] = useState(false);
+  const [loadingSizes, setLoadingSizes] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setSelectedCat(formData?.category     || '');
-    setSelectedSeries(formData?.series       || '');
-    setSelectedSize(formData?.instanceSize || '');
-  }, [formData]);
+  const notifyChange = (category: string, series: string, instanceSize: string): void => {
+    const fullFormData = parentFormData
+      ? {
+          ...parentFormData,
+          instanceSelector: {
+            category,
+            series,
+            instanceSize,
+          },
+        }
+      : {
+          category,
+          series,
+          instanceSize,
+        };
+    onChange(fullFormData);
+  };
 
-  // ── Fetch categories on mount ──────────────────────────────────────────────
-  useEffect(() => {
-    fetchCategories();
-  }, []);
-
-  // ── Re-fetch series + sizes when parent region genuinely changes ──────────
-  useEffect(() => {
-    if (prevRegionRef.current === region) return;   // same region — skip
-    prevRegionRef.current = region;
-    if (selectedCat) {
-      setSelectedSeries('');
-      setSizes([]);
-      setSelectedSize('');
-      fetchSeries(selectedCat, region);
-    }
-  }, [region]);
-
-  // ── Cascade: category change → fetch series ────────────────────────────────
-  useEffect(() => {
-    if (selectedCat) {
-      fetchSeries(selectedCat, region);
-    } else {
-      setSeriesList([]);
-      setSelectedSeries('');
-      setSizes([]);
-      setSelectedSize('');
-    }
-  }, [selectedCat]);
-
-  // ── Cascade: series change → fetch sizes ──────────────────────────────────
-  useEffect(() => {
-    if (selectedCat && selectedSeries) {
-      fetchSizes(selectedCat, selectedSeries, region);
-    } else {
-      setSizes([]);
-      setSelectedSize('');
-    }
-  }, [selectedSeries]);
-  // ── API calls ──────────────────────────────────────────────────────────────
-
-  const fetchCategories = async (): Promise<void> => {
+  const fetchCategories = async (r: string, os: string): Promise<void> => {
     setLoadingCats(true);
     setError(null);
     try {
-      const res = await axios.get('/api/vm/instances/categories');
-      setCategories(res.data.categories || []);
+      const res = await axios.get(
+        `/api/vm/instances/categories?region=${encodeURIComponent(r)}&operatingSystem=${encodeURIComponent(os)}&linuxType=${encodeURIComponent(linuxType)}&tier=${encodeURIComponent(tier)}`
+      );
+      const incoming: Category[] = res.data.categories || [];
+      setCategories(incoming);
+
+      if (selectedCat && !incoming.find((cat) => cat.slug === selectedCat)) {
+        setSelectedCat('');
+        setSelectedSeries('');
+        setSelectedSize('');
+        setSeriesList([]);
+        setSizes([]);
+        notifyChange('', '', '');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load categories');
+      setCategories([]);
     } finally {
       setLoadingCats(false);
     }
   };
 
-  const fetchSeries = async (category: string, region: string): Promise<void> => {
+  const fetchSeries = async (category: string, r: string, os: string): Promise<void> => {
     setLoadingSeries(true);
     setError(null);
     try {
       const res = await axios.get(
-        `/api/vm/instances/series?category=${encodeURIComponent(category)}&region=${encodeURIComponent(region)}`
+        `/api/vm/instances/series?category=${encodeURIComponent(category)}&region=${encodeURIComponent(r)}&operatingSystem=${encodeURIComponent(os)}&linuxType=${encodeURIComponent(linuxType)}&tier=${encodeURIComponent(tier)}`
       );
-      setSeriesList(res.data.series || []);
+      const incoming: Series[] = res.data.series || [];
+      setSeriesList(incoming);
+
+      if (selectedSeries && !incoming.find((series) => series.slug === selectedSeries)) {
+        setSelectedSeries('');
+        setSelectedSize('');
+        setSizes([]);
+        notifyChange(category, '', '');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load series');
       setSeriesList([]);
@@ -136,21 +119,21 @@ const AzureVMInstanceField: React.FC<FieldProps<VMInstanceData>> = (props) => {
     }
   };
 
-  const fetchSizes = async (category: string, series: string, region: string): Promise<void> => {
+  const fetchSizes = async (category: string, series: string, r: string, os: string): Promise<void> => {
     setLoadingSizes(true);
     setError(null);
     try {
       const res = await axios.get(
-        `/api/vm/instances/sizes?category=${encodeURIComponent(category)}&series=${encodeURIComponent(series)}&region=${encodeURIComponent(region)}`
+        `/api/vm/instances/sizes?category=${encodeURIComponent(category)}&series=${encodeURIComponent(series)}&region=${encodeURIComponent(r)}&operatingSystem=${encodeURIComponent(os)}&linuxType=${encodeURIComponent(linuxType)}&tier=${encodeURIComponent(tier)}`
       );
       const incoming: InstanceSize[] = res.data.sizes || [];
       setSizes(incoming);
 
-      // If the previously selected size no longer exists in the new list, clear it.
-      if (selectedSize && !incoming.find(s => s.slug === selectedSize)) {
+      if (selectedSize && !incoming.find((size) => size.slug === selectedSize)) {
         setSelectedSize('');
         notifyChange(category, series, '');
-      }    } catch (err) {
+      }
+    } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load sizes');
       setSizes([]);
     } finally {
@@ -158,29 +141,61 @@ const AzureVMInstanceField: React.FC<FieldProps<VMInstanceData>> = (props) => {
     }
   };
 
-  // ── rjsf onChange contract ─────────────────────────────────────────────────
+  useEffect(() => {
+    setSelectedCat(formData?.category || '');
+    setSelectedSeries(formData?.series || '');
+    setSelectedSize(formData?.instanceSize || '');
+  }, [formData]);
 
-  const notifyChange = (category: string, series: string, instanceSize: string): void => {
-    // CRITICAL: Pass the ENTIRE parent form data back, with updated instanceSelector.
-    // Use data from context to ensure we preserve all fields like region.
-    const fullFormData = parentFormData ? {
-      ...parentFormData,
-      instanceSelector: { 
-        category, 
-        series, 
-        instanceSize 
+  useEffect(() => {
+    fetchCategories(region, operatingSystem);
+  }, []);
+
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+
+    resettingRef.current = true;
+    setSelectedCat('');
+    setSelectedSeries('');
+    setSelectedSize('');
+    setSeriesList([]);
+    setSizes([]);
+    fetchCategories(region, operatingSystem);
+  }, [region, operatingSystem, linuxType, tier]);
+
+  useEffect(() => {
+    if (resettingRef.current) {
+      if (!selectedCat && !selectedSeries && !selectedSize) {
+        resettingRef.current = false;
       }
-    } : { 
-      category, 
-      series, 
-      instanceSize 
-    };
-    console.log("📦 notifyChange sending full formData:", fullFormData);
-    console.log("📦 notifyChange - region:", fullFormData?.region);
-    onChange(fullFormData);
-  };
+      return;
+    }
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
+    if (selectedCat) {
+      fetchSeries(selectedCat, region, operatingSystem);
+    } else {
+      setSeriesList([]);
+      setSelectedSeries('');
+      setSizes([]);
+      setSelectedSize('');
+    }
+  }, [selectedCat, region, operatingSystem, linuxType, tier]);
+
+  useEffect(() => {
+    if (resettingRef.current) {
+      return;
+    }
+
+    if (selectedCat && selectedSeries) {
+      fetchSizes(selectedCat, selectedSeries, region, operatingSystem);
+    } else {
+      setSizes([]);
+      setSelectedSize('');
+    }
+  }, [selectedSeries, selectedCat, region, operatingSystem, linuxType, tier]);
 
   const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>): void => {
     const cat = e.target.value;
@@ -205,30 +220,24 @@ const AzureVMInstanceField: React.FC<FieldProps<VMInstanceData>> = (props) => {
 
   const handleRetry = (): void => {
     if (!selectedCat) {
-      fetchCategories();
+      fetchCategories(region, operatingSystem);
     } else if (!selectedSeries) {
-      fetchSeries(selectedCat, region);
+      fetchSeries(selectedCat, region, operatingSystem);
     } else {
-      fetchSizes(selectedCat, selectedSeries, region);
+      fetchSizes(selectedCat, selectedSeries, region, operatingSystem);
     }
   };
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
 
   const sizeLabel = (s: InstanceSize): string => {
     let label = s.displayName;
     if (s.vcpus !== undefined && s.ram !== undefined) {
-      label += ` — ${s.vcpus} vCPU${s.vcpus !== 1 ? 's' : ''}, ${s.ram} GiB RAM`;
+      label += ` - ${s.vcpus} vCPU${s.vcpus !== 1 ? 's' : ''}, ${s.ram} GiB RAM`;
     }
     return label;
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
-
   return (
     <div className="azure-vm-instance-field">
-
-      {/* Category */}
       <div className="form-group">
         <label htmlFor={`${name}-category`}>
           Instance Category {required && <span className="required">*</span>}
@@ -241,10 +250,8 @@ const AzureVMInstanceField: React.FC<FieldProps<VMInstanceData>> = (props) => {
           disabled={loadingCats}
           required={required}
         >
-          <option value="">
-            {loadingCats ? 'Loading categories…' : 'Select a category'}
-          </option>
-          {categories.map(cat => (
+          <option value="">{loadingCats ? 'Loading categories...' : 'Select a category'}</option>
+          {categories.map((cat) => (
             <option key={cat.slug} value={cat.slug}>
               {cat.display}
             </option>
@@ -252,7 +259,6 @@ const AzureVMInstanceField: React.FC<FieldProps<VMInstanceData>> = (props) => {
         </select>
       </div>
 
-      {/* Series */}
       <div className="form-group">
         <label htmlFor={`${name}-series`}>
           Instance Series {required && <span className="required">*</span>}
@@ -266,21 +272,16 @@ const AzureVMInstanceField: React.FC<FieldProps<VMInstanceData>> = (props) => {
           required={required}
         >
           <option value="">
-            {loadingSeries
-              ? 'Loading series…'
-              : selectedCat
-                ? 'Select a series'
-                : 'First select a category'}
+            {loadingSeries ? 'Loading series...' : selectedCat ? 'Select a series' : 'First select a category'}
           </option>
-          {seriesList.map(s => (
-            <option key={s.slug} value={s.slug}>
-              {s.display}
+          {seriesList.map((series) => (
+            <option key={series.slug} value={series.slug}>
+              {series.display}
             </option>
           ))}
         </select>
       </div>
 
-      {/* Instance Size */}
       <div className="form-group">
         <label htmlFor={`${name}-size`}>
           Instance Size {required && <span className="required">*</span>}
@@ -294,15 +295,11 @@ const AzureVMInstanceField: React.FC<FieldProps<VMInstanceData>> = (props) => {
           required={required}
         >
           <option value="">
-            {loadingSizes
-              ? 'Loading sizes…'
-              : selectedSeries
-                ? 'Select an instance size'
-                : 'First select a series'}
+            {loadingSizes ? 'Loading sizes...' : selectedSeries ? 'Select an instance size' : 'First select a series'}
           </option>
-          {sizes.map(s => (
-            <option key={s.slug} value={s.slug}>
-              {sizeLabel(s)}
+          {sizes.map((size) => (
+            <option key={size.slug} value={size.slug}>
+              {sizeLabel(size)}
             </option>
           ))}
         </select>
@@ -313,7 +310,6 @@ const AzureVMInstanceField: React.FC<FieldProps<VMInstanceData>> = (props) => {
         )}
       </div>
 
-      {/* Error */}
       {error && (
         <div className="alert alert-danger" role="alert">
           <strong>Error:</strong> {error}

@@ -1,0 +1,189 @@
+{
+  "serviceid": 3,
+  "serviceshortname": "azurefunctions-pricing",
+  "pricingconfig": {
+    "title": "Azure Functions Pricing Calculator",
+    "type": "object",
+    "required": ["tier", "region"],
+    "properties": {
+      "tier": {
+        "title": "Hosting Plan",
+        "type": "string",
+        "description": "Azure Functions hosting plan type",
+        "enum": ["consumption", "flexconsumption", "premium"],
+        "enumNames": ["Consumption", "Flex Consumption", "Premium"],
+        "default": "consumption"
+      },
+      "region": {
+        "title": "Region",
+        "type": "string",
+        "enum": [
+          "us-west", "us-east", "us-east-2", "us-central",
+          "europe-west", "europe-north", "asia-pacific-east",
+          "asia-pacific-southeast", "australia-east", "japan-east",
+          "canada-central", "brazil-south", "uk-south",
+          "france-central", "switzerland-north", "sweden-central",
+          "norway-east", "uae-north", "south-africa-north",
+          "korea-central", "central-india", "australia-southeast"
+        ],
+        "enumNames": [
+          "West US", "East US", "East US 2", "Central US",
+          "West Europe", "North Europe", "East Asia",
+          "Southeast Asia", "Australia East", "Japan East",
+          "Canada Central", "Brazil South", "UK South",
+          "France Central", "Switzerland North", "Sweden Central",
+          "Norway East", "UAE North", "South Africa North",
+          "Korea Central", "Central India", "Australia Southeast"
+        ],
+        "default": "us-west"
+      },
+
+      "consumption_tier": {
+        "title": "Consumption Plan Settings",
+        "type": "object",
+        "description": "Only applicable when tier = 'consumption'",
+        "properties": {
+          "memorySize": {
+            "title": "Memory Size (MB)",
+            "type": "integer",
+            "enum": [128, 256, 512, 1024, 1536],
+            "enumNames": ["128 MB", "256 MB", "512 MB", "1 GB", "1.5 GB"],
+            "default": 128
+          },
+          "executionCount": {
+            "title": "Monthly Executions",
+            "type": "number",
+            "minimum": 0,
+            "default": 1000000
+          },
+          "executionTime": {
+            "title": "Average Execution Time (ms)",
+            "type": "number",
+            "minimum": 1,
+            "default": 100
+          }
+        }
+      },
+
+      "flexconsumption_tier": {
+        "title": "Flex Consumption Plan Settings",
+        "type": "object",
+        "description": "Only applicable when tier = 'flexconsumption'",
+        "properties": {
+          "instanceMemorySize": {
+            "title": "Instance Memory Size (MB)",
+            "type": "integer",
+            "enum": [2048, 4096, 8192],
+            "enumNames": ["2 GB", "4 GB", "8 GB"],
+            "default": 2048
+          },
+          "onDemandExecutions": {
+            "title": "On-Demand Total Executions / Month (×10)",
+            "type": "number",
+            "minimum": 0,
+            "default": 0
+          },
+          "onDemandExecutionTime": {
+            "title": "On-Demand Active Execution Seconds / Instance / Month",
+            "type": "number",
+            "minimum": 0,
+            "default": 0
+          },
+          "onDemandInstances": {
+            "title": "On-Demand Active Instances",
+            "type": "number",
+            "minimum": 0,
+            "default": 0
+          },
+          "alwaysReadyEnabled": {
+            "title": "Enable Always Ready",
+            "type": "boolean",
+            "default": false
+          },
+          "alwaysReadyInstances": {
+            "title": "Always Ready Baseline Instances",
+            "type": "number",
+            "minimum": 0,
+            "default": 0
+          },
+          "alwaysReadyBaselineExecTime": {
+            "title": "Always Ready Baseline Exec Seconds / Instance / Month",
+            "type": "number",
+            "minimum": 0,
+            "default": 0
+          },
+          "alwaysReadyTotalExecutions": {
+            "title": "Always Ready Total Executions / Month (×10)",
+            "type": "number",
+            "minimum": 0,
+            "default": 0
+          },
+          "alwaysReadyActiveExecTime": {
+            "title": "Always Ready Active Exec Seconds / Instance / Month",
+            "type": "number",
+            "minimum": 0,
+            "default": 0
+          },
+          "alwaysReadyActiveInstances": {
+            "title": "Always Ready Active Instances",
+            "type": "number",
+            "minimum": 0,
+            "default": 0
+          }
+        }
+      },
+
+      "premium_tier": {
+        "title": "Premium Plan Settings",
+        "type": "object",
+        "description": "Only applicable when tier = 'premium'",
+        "properties": {
+          "instance": {
+            "title": "Instance Type",
+            "type": "string",
+            "enum": ["ep1", "ep2", "ep3"],
+            "enumNames": [
+              "EP1: 1 vCPU, 3.5 GB RAM",
+              "EP2: 2 vCPU, 7.0 GB RAM",
+              "EP3: 4 vCPU, 14.0 GB RAM"
+            ],
+            "default": "ep1"
+          },
+          "billingOption": {
+            "title": "Billing Option",
+            "type": "string",
+            "enum": ["payg", "sv-one-year", "sv-three-year"],
+            "enumNames": ["Pay as you go", "1-Year Savings Plan", "3-Year Savings Plan"],
+            "default": "payg"
+          },
+          "preWarmedCount": {
+            "title": "Minimum Pre-Warmed Instances",
+            "type": "integer",
+            "minimum": 1,
+            "default": 1
+          },
+          "preWarmedHours": {
+            "title": "Pre-Warmed Hours / Month",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 744,
+            "default": 730
+          },
+          "additionalUnitsCount": {
+            "title": "Additional Scaled-Out Units",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          },
+          "additionalUnitsHours": {
+            "title": "Additional Units Hours / Month",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 744,
+            "default": 0
+          }
+        }
+      }
+    }
+  }
+}

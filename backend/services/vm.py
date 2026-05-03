@@ -7,9 +7,9 @@ Windows: License Included or Azure Hybrid Benefit.
 Linux subtypes: populated dynamically from VM metadata linuxTypes array.
 
 Instance selector endpoints (MongoDB-backed, no Azure call):
-  /vm/instances/categories   — all distinct categories
-  /vm/instances/series       — series filtered by ?category=
-  /vm/instances/sizes        — sizes filtered by ?category= & ?series=
+  /vm/instances/categories   — categories filtered by ?region= & ?operatingSystem= & ?tier=
+  /vm/instances/series       — series filtered by ?region= & ?operatingSystem= & ?tier= & ?category=
+  /vm/instances/sizes        — sizes filtered by ?region= & ?operatingSystem= & ?tier= & ?category= & ?series=
 
 Add-on sections:
   /vm/managed-disks/*        — Tier + Redundancy + Disk Size + Count
@@ -361,11 +361,14 @@ def _get_software_hourly(offers, size, tier, linux_type_slug, region):
     return None
 
 def _get_vm_hourly(offers, region, size, tier, operating_system, linux_type="ubuntu", ahb=False):
+    if operating_system == "windows":
+        compute = _get_price_v4(_get_offer(offers, f"windows-{size}-{tier}"), "perhour", region)
+        if compute is None:
+            return None
+        return compute + (0.0 if ahb else _get_windows_license_hourly(offers, size, tier, region))
     compute = _get_compute_hourly(offers, size, tier, region)
     if compute is None:
-        return _get_price_v4(_get_offer(offers, f"windows-{size}-{tier}"), "perhour", region)
-    if operating_system == "windows":
-        return compute + (0.0 if ahb else _get_windows_license_hourly(offers, size, tier, region))
+        return None
     software = _get_software_hourly(offers, size, tier, linux_type, region)
     if software is None:
         return None
@@ -463,31 +466,82 @@ def _calc_vm(fd, calc_data, region):
     return round(price * hours * count, 4)
 
 
+def _size_supports_selection(size_doc, tier, operating_system, linux_type):
+    if tier not in (size_doc.get("tiers") or []):
+        return False
+
+    if operating_system != "linux":
+        return True
+
+    linux_types = size_doc.get("linuxTypes") or {}
+    if not isinstance(linux_types, dict) or not linux_types:
+        return True
+
+    supported_tiers = linux_types.get(linux_type, [])
+    return tier in (supported_tiers or [])
+
+
+def _series_supports_selection(series_doc, tier, operating_system, linux_type):
+    return any(
+        _size_supports_selection(size, tier, operating_system, linux_type)
+        for size in series_doc.get("sizes", [])
+    )
+
+
+def _category_supports_selection(category_doc, tier, operating_system, linux_type):
+    return any(
+        _series_supports_selection(series_doc, tier, operating_system, linux_type)
+        for series_doc in category_doc.get("series", [])
+    )
+
+
+def _filter_series_for_selection(category_doc, tier, operating_system, linux_type):
+    result = []
+    for series_doc in category_doc.get("series", []):
+        sizes = [
+            size
+            for size in series_doc.get("sizes", [])
+            if _size_supports_selection(size, tier, operating_system, linux_type)
+        ]
+        if not sizes:
+            continue
+        result.append({
+            "slug": series_doc.get("slug", ""),
+            "display": series_doc.get("displayName", series_doc.get("slug", "")),
+            "sizes": sizes,
+        })
+    return result
+
+
 # ── Instance Selector — MongoDB-backed endpoints ──────────────────────────────
 
 @ns.route("/instances/categories")
 class InstanceCategories(Resource):
     def get(self):
         """
-        Return all distinct VM categories.
-        Categories are global (not region-filtered) — every category exists
-        in every major region so filtering here adds overhead with no UX benefit.
+        Return distinct VM categories for a region + operating system + tier.
         """
         try:
             col = _get_collection()
-            pipeline = [
-                {"$match": {"provider": "azure"}},
-                {"$group": {
-                    "_id":     "$category",
-                    "display": {"$first": "$category_display"},
-                }},
-                {"$sort": {"_id": 1}},
-            ]
-            docs = list(col.aggregate(pipeline))
+            region = request.args.get("region", "").strip()
+            operating_system = request.args.get("operatingSystem", "").strip()
+            linux_type = request.args.get("linuxType", "ubuntu").strip() or "ubuntu"
+            tier = request.args.get("tier", "standard").strip() or "standard"
+            if not region or not operating_system:
+                return {"error": "region and operatingSystem are required"}, 400
+            docs = list(col.find(
+                {
+                    "provider": "azure",
+                    "region": region,
+                    "operatingSystem": operating_system,
+                },
+                {"_id": 0, "category": 1, "category_display": 1, "series": 1},
+            ))
             return {
                 "categories": [
-                    {"slug": d["_id"], "display": d["display"]}
+                    {"slug": d["category"], "display": d.get("category_display", d["category"])}
                     for d in docs
+                    if _category_supports_selection(d, tier, operating_system, linux_type)
                 ]
             }
         except Exception as e:
@@ -498,33 +552,32 @@ class InstanceCategories(Resource):
 class InstanceSeries(Resource):
     def get(self):
         """
-        Return distinct series available in a given region + category.
-        ?region=   (required for region-aware filtering)
-        ?category= (required)
-        Both params are required for meaningful results; falls back gracefully if omitted.
+        Return distinct series available in a given region + operating system + category + tier.
         """
         try:
             col      = _get_collection()
             region   = request.args.get("region",   "").strip()
+            operating_system = request.args.get("operatingSystem", "").strip()
+            linux_type = request.args.get("linuxType", "ubuntu").strip() or "ubuntu"
+            tier = request.args.get("tier", "standard").strip() or "standard"
             category = request.args.get("category", "").strip()
-            match    = {"provider": "azure"}
-            if region:
-                match["region"] = region
-            if category:
-                match["category"] = category
-            pipeline = [
-                {"$match": match},
-                {"$group": {
-                    "_id":     "$series",
-                    "display": {"$first": "$series_display"},
-                }},
-                {"$sort": {"_id": 1}},
-            ]
-            docs = list(col.aggregate(pipeline))
+            if not region or not operating_system or not category:
+                return {"error": "region, operatingSystem, and category are all required"}, 400
+            doc = col.find_one(
+                {
+                "provider": "azure",
+                "region": region,
+                "operatingSystem": operating_system,
+                "category": category,
+                },
+                {"_id": 0, "series": 1},
+            )
+            if not doc:
+                return {"series": []}
             return {
                 "series": [
-                    {"slug": d["_id"], "display": d["display"]}
-                    for d in docs
+                    {"slug": s["slug"], "display": s.get("displayName", s["slug"])}
+                    for s in _filter_series_for_selection(doc, tier, operating_system, linux_type)
                 ]
             }
         except Exception as e:
@@ -535,33 +588,47 @@ class InstanceSeries(Resource):
 class InstanceSizes(Resource):
     def get(self):
         """
-        Return instance sizes for a given region + category + series.
-        This is now a single document point-lookup — O(1) after index.
-        ?region=   (required)
-        ?category= (required)
-        ?series=   (required)
+        Return instance sizes for a given region + operating system + category + series + tier.
         """
         try:
             col      = _get_collection()
             region   = request.args.get("region",   "").strip()
+            operating_system = request.args.get("operatingSystem", "").strip()
+            linux_type = request.args.get("linuxType", "ubuntu").strip() or "ubuntu"
+            tier = request.args.get("tier", "standard").strip() or "standard"
             category = request.args.get("category", "").strip()
             series   = request.args.get("series",   "").strip()
 
-            if not region or not category or not series:
-                return {"error": "region, category, and series are all required"}, 400
+            if not region or not operating_system or not category or not series:
+                return {"error": "region, operatingSystem, category, and series are all required"}, 400
 
             doc = col.find_one(
                 {
                     "provider": "azure",
-                    "region":   region,
+                    "region": region,
+                    "operatingSystem": operating_system,
                     "category": category,
-                    "series":   series,
                 },
-                {"_id": 0, "instances": 1},
+                {"_id": 0, "series": 1},
             )
             if not doc:
                 return {"sizes": []}
-            return {"sizes": doc.get("instances", [])}
+            for series_doc in doc.get("series", []):
+                if series_doc.get("slug") != series:
+                    continue
+                sizes = [
+                    {
+                        "slug": size["slug"],
+                        "displayName": size.get("displayName", size["slug"]),
+                        "vcpus": size.get("vcpus"),
+                        "ram": size.get("ram"),
+                        "diskSize": size.get("diskSize"),
+                    }
+                    for size in series_doc.get("sizes", [])
+                    if _size_supports_selection(size, tier, operating_system, linux_type)
+                ]
+                return {"sizes": sizes}
+            return {"sizes": []}
         except Exception as e:
             return {"error": str(e)}, 500
 

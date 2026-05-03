@@ -1,0 +1,188 @@
+{
+  "serviceid": 3,
+  "serviceshortname": "azurefunctions-pricing",
+  "uischema": {
+    "ui:order": [
+      "tier",
+      "region",
+      "consumption_tier",
+      "flexconsumption_tier",
+      "premium_tier"
+    ],
+    "tier": {
+      "ui:help": "Select the Azure Functions hosting plan. Consumption: Pay per execution (ideal for variable workloads). Flex Consumption: Hybrid on-demand + always-ready instances. Premium: Reserved capacity with faster cold starts.",
+      "ui:widget": "radio",
+      "ui:options": {
+        "inline": false
+      }
+    },
+    "region": {
+      "ui:help": "Select the Azure region where your function app will be deployed. Regional pricing varies significantly.",
+      "ui:widget": "select"
+    },
+    "consumption_tier": {
+      "ui:title": "Consumption Plan Pricing",
+      "ui:field": "consumptionConfig",
+      "ui:options": {
+        "collapsible": true,
+        "collapsed": false,
+        "expandable": true
+      },
+      "ui:help": "Configure pricing parameters for Consumption plan. You pay for GB-seconds of execution and number of requests.",
+      "ui:order": [
+        "memorySize",
+        "executionCount",
+        "executionTime"
+      ],
+      "memorySize": {
+        "ui:help": "Memory allocated per function execution. Higher memory = faster execution (billed per GB-second).",
+        "ui:widget": "select"
+      },
+      "executionCount": {
+        "ui:help": "Estimated number of function invocations per month. First 1M executions/month are free.",
+        "ui:widget": "updown"
+      },
+      "executionTime": {
+        "ui:help": "Average duration of each execution in milliseconds. Billed in 100ms increments.",
+        "ui:widget": "updown"
+      }
+    },
+    "flexconsumption_tier": {
+      "ui:title": "Flex Consumption Plan Pricing",
+      "ui:field": "flexConsumptionConfig",
+      "ui:options": {
+        "collapsible": true,
+        "collapsed": true,
+        "expandable": true
+      },
+      "ui:help": "Configure on-demand and always-ready instance settings for Flex Consumption plan.",
+      "ui:order": [
+        "instanceMemorySize",
+        "onDemandExecutions",
+        "onDemandExecutionTime",
+        "onDemandInstances",
+        "alwaysReadyEnabled",
+        "alwaysReadyInstances",
+        "alwaysReadyBaselineExecTime",
+        "alwaysReadyTotalExecutions",
+        "alwaysReadyActiveExecTime",
+        "alwaysReadyActiveInstances"
+      ],
+      "instanceMemorySize": {
+        "ui:help": "Memory allocated to each function instance. Larger instances support higher concurrency.",
+        "ui:widget": "select"
+      },
+      "onDemandExecutions": {
+        "ui:help": "Total on-demand executions per month (in units of 10, so 100 = 1,000 executions).",
+        "ui:widget": "updown"
+      },
+      "onDemandExecutionTime": {
+        "ui:help": "Total active execution seconds per instance per month for on-demand workloads.",
+        "ui:widget": "updown"
+      },
+      "onDemandInstances": {
+        "ui:help": "Number of active on-demand instances running concurrently.",
+        "ui:widget": "updown"
+      },
+      "alwaysReadyEnabled": {
+        "ui:help": "Enable Always-Ready instances for baseline guaranteed capacity (reduces cold starts).",
+        "ui:widget": "checkbox"
+      },
+      "alwaysReadyInstances": {
+        "ui:help": "Number of always-ready instances to keep warm continuously.",
+        "ui:widget": "updown",
+        "ui:options": {
+          "condition": {
+            "property": "alwaysReadyEnabled",
+            "equals": true
+          }
+        }
+      },
+      "alwaysReadyBaselineExecTime": {
+        "ui:help": "Baseline execution seconds per always-ready instance per month.",
+        "ui:widget": "updown",
+        "ui:options": {
+          "condition": {
+            "property": "alwaysReadyEnabled",
+            "equals": true
+          }
+        }
+      },
+      "alwaysReadyTotalExecutions": {
+        "ui:help": "Total always-ready executions per month (in units of 10).",
+        "ui:widget": "updown",
+        "ui:options": {
+          "condition": {
+            "property": "alwaysReadyEnabled",
+            "equals": true
+          }
+        }
+      },
+      "alwaysReadyActiveExecTime": {
+        "ui:help": "Active execution seconds per always-ready instance per month (beyond baseline).",
+        "ui:widget": "updown",
+        "ui:options": {
+          "condition": {
+            "property": "alwaysReadyEnabled",
+            "equals": true
+          }
+        }
+      },
+      "alwaysReadyActiveInstances": {
+        "ui:help": "Number of always-ready instances handling active workloads beyond baseline.",
+        "ui:widget": "updown",
+        "ui:options": {
+          "condition": {
+            "property": "alwaysReadyEnabled",
+            "equals": true
+          }
+        }
+      }
+    },
+    "premium_tier": {
+      "ui:title": "Premium Plan Pricing",
+      "ui:field": "premiumConfig",
+      "ui:options": {
+        "collapsible": true,
+        "collapsed": true,
+        "expandable": true
+      },
+      "ui:help": "Configure premium instance sizing and billing options. Premium offers dedicated compute with guaranteed baseline capacity.",
+      "ui:order": [
+        "instance",
+        "billingOption",
+        "preWarmedCount",
+        "preWarmedHours",
+        "additionalUnitsCount",
+        "additionalUnitsHours"
+      ],
+      "instance": {
+        "ui:help": "Premium instance tier. EP1: 1 core, 3.5 GB RAM. EP2: 2 cores, 7 GB RAM. EP3: 4 cores, 14 GB RAM.",
+        "ui:widget": "select"
+      },
+      "billingOption": {
+        "ui:help": "Pay-as-you-go (PAYG) or Savings Plans (1-year or 3-year commitment for discounts).",
+        "ui:widget": "radio",
+        "ui:options": {
+          "inline": true
+        }
+      },
+      "preWarmedCount": {
+        "ui:help": "Minimum number of pre-warmed (always running) instances. Baseline capacity.",
+        "ui:widget": "updown"
+      },
+      "preWarmedHours": {
+        "ui:help": "Hours per month the pre-warmed instances will be running (max 744 hours = full month).",
+        "ui:widget": "updown"
+      },
+      "additionalUnitsCount": {
+        "ui:help": "Additional scaled-out instances for peak capacity beyond pre-warmed baseline.",
+        "ui:widget": "updown"
+      },
+      "additionalUnitsHours": {
+        "ui:help": "Hours per month the additional scaled-out instances will be active.",
+        "ui:widget": "updown"
+      }
+    }
+  }
+}

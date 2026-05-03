@@ -1,0 +1,184 @@
+{
+  "serviceid": 4,
+  "serviceshortname": "azurevm-pricing",
+  "uischema": {
+    "ui:order": [
+      "region",
+      "operatingSystem",
+      "linuxType",
+      "tier",
+      "instanceSelector",
+      "count",
+      "hours",
+      "addHybridBenefit",
+      "managedDisks",
+      "storageTransactions",
+      "bandwidth"
+    ],
+    "region": {
+      "ui:help": "Select the Azure region where your VM will be deployed. The instance picker is filtered by the selected region.",
+      "ui:widget": "select"
+    },
+    "operatingSystem": {
+      "ui:help": "Choose between Linux and Windows. Windows pricing may include license charges unless Azure Hybrid Benefit is enabled.",
+      "ui:widget": "radio",
+      "ui:options": {
+        "inline": true
+      }
+    },
+    "linuxType": {
+      "ui:help": "Select the Linux distribution or software variant. Ubuntu is free; Red Hat, SUSE, Ubuntu Pro, and SQL variants may add software licensing charges.",
+      "ui:widget": "select",
+      "ui:options": {
+        "condition": {
+          "property": "operatingSystem",
+          "equals": "linux"
+        }
+      }
+    },
+    "tier": {
+      "ui:help": "Select the VM tier. Standard offers full VM capabilities; Basic is available only for limited older size families.",
+      "ui:widget": "radio",
+      "ui:options": {
+        "inline": true
+      }
+    },
+    "instanceSelector": {
+      "ui:title": "Instance Selection",
+      "ui:field": "azureVMInstanceField",
+      "ui:help": "Select the VM category, series, and size. Options are loaded dynamically from the VM instance catalog for the selected region, OS, Linux type, and tier.",
+      "ui:options": {
+        "cascading": true,
+        "displaySpecs": true
+      }
+    },
+    "count": {
+      "ui:help": "Total number of VM instances to price.",
+      "ui:widget": "updown"
+    },
+    "hours": {
+      "ui:help": "Average hours per month the VM will be running. 730 hours is approximately a full month.",
+      "ui:widget": "updown"
+    },
+    "addHybridBenefit": {
+      "ui:help": "Enable Azure Hybrid Benefit when you have eligible Windows Server or SQL Server licenses. Windows only.",
+      "ui:widget": "checkbox",
+      "ui:options": {
+        "condition": {
+          "property": "operatingSystem",
+          "equals": "windows"
+        }
+      }
+    },
+    "managedDisks": {
+      "ui:title": "Managed Disks",
+      "ui:field": "managedDisksConfig",
+      "ui:help": "Configure optional managed disk storage charges. Storage transaction pricing is handled separately below.",
+      "ui:options": {
+        "collapsible": true,
+        "collapsed": true,
+        "expandable": true
+      },
+      "ui:order": [
+        "enabled",
+        "diskTier",
+        "redundancy",
+        "diskSize",
+        "count"
+      ],
+      "enabled": {
+        "ui:help": "Enable managed disk pricing.",
+        "ui:widget": "checkbox"
+      },
+      "diskTier": {
+        "ui:help": "Select the disk performance tier.",
+        "ui:widget": "select"
+      },
+      "redundancy": {
+        "ui:help": "Select locally redundant or zone-redundant storage.",
+        "ui:widget": "radio",
+        "ui:options": {
+          "inline": true
+        }
+      },
+      "diskSize": {
+        "ui:help": "Select the managed disk size.",
+        "ui:widget": "select"
+      },
+      "count": {
+        "ui:help": "Number of managed disks to price.",
+        "ui:widget": "updown"
+      }
+    },
+    "storageTransactions": {
+      "ui:title": "Storage Transactions",
+      "ui:field": "storageTransactionsConfig",
+      "ui:help": "Configure optional transaction charges for Standard HDD and Standard SSD disks. Premium SSD has no transaction charge.",
+      "ui:options": {
+        "collapsible": true,
+        "collapsed": true,
+        "expandable": true
+      },
+      "ui:order": [
+        "enabled",
+        "transactionUnits"
+      ],
+      "enabled": {
+        "ui:help": "Enable storage transaction pricing.",
+        "ui:widget": "checkbox"
+      },
+      "transactionUnits": {
+        "ui:help": "Transaction units per month. One unit equals 10,000 transactions.",
+        "ui:widget": "updown"
+      }
+    },
+    "bandwidth": {
+      "ui:title": "Bandwidth",
+      "ui:field": "bandwidthConfig",
+      "ui:help": "Configure optional outbound bandwidth charges for inter-region or internet egress traffic.",
+      "ui:options": {
+        "collapsible": true,
+        "collapsed": true,
+        "expandable": true
+      },
+      "ui:order": [
+        "enabled",
+        "dataTransferType",
+        "sourceRegion",
+        "destinationRegion",
+        "routedVia",
+        "egressGB"
+      ],
+      "enabled": {
+        "ui:help": "Enable bandwidth pricing.",
+        "ui:widget": "checkbox"
+      },
+      "dataTransferType": {
+        "ui:help": "Select inter-region transfer or internet egress.",
+        "ui:widget": "radio",
+        "ui:options": {
+          "inline": true
+        }
+      },
+      "sourceRegion": {
+        "ui:help": "Region where outbound traffic originates.",
+        "ui:widget": "select"
+      },
+      "destinationRegion": {
+        "ui:help": "Destination region for inter-region transfers.",
+        "ui:widget": "select"
+      },
+      "routedVia": {
+        "ui:help": "Routing option for internet egress.",
+        "ui:widget": "radio",
+        "ui:options": {
+          "inline": true
+        }
+      },
+      "egressGB": {
+        "ui:help": "Outbound data transfer volume in GB.",
+        "ui:widget": "updown"
+      }
+    }
+  }
+}

@@ -282,7 +282,7 @@ def _calc_flex(fd, data, region):
     go     = data.get("graduatedOffers", {})
     total  = 0.0
 
-    od_execs   = float(fd.get("onDemandExecutions", 0)) * 10
+    od_execs   = float(fd.get("onDemandExecutions", 0)) 
     od_secs    = float(fd.get("onDemandExecutionTime", 0))
     od_inst    = float(fd.get("onDemandInstances", 0))
     od_gb_s    = od_inst * od_secs * mem_gb

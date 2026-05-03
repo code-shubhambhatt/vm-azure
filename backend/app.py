@@ -9,6 +9,7 @@ from flask_cors import CORS
 
 from services.functions import ns as functions_ns
 from services.vm        import ns as vm_ns
+from services.storage   import ns as storage_ns
 
 app = Flask(__name__)
 CORS(app)
@@ -23,6 +24,7 @@ api = Api(
 
 api.add_namespace(functions_ns, path="/functions")
 api.add_namespace(vm_ns,        path="/vm")
+api.add_namespace(storage_ns,   path="/storage")
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
