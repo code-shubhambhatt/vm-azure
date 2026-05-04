@@ -282,10 +282,10 @@ def _calc_flex(fd, data, region):
     go     = data.get("graduatedOffers", {})
     total  = 0.0
 
-    od_execs   = float(fd.get("onDemandExecutions", 0)) 
-    od_secs    = float(fd.get("onDemandExecutionTime", 0))
-    od_inst    = float(fd.get("onDemandInstances", 0))
-    od_gb_s    = od_inst * od_secs * mem_gb
+    od_execs = float(fd.get("onDemandExecutions", 0))
+    od_secs  = float(fd.get("onDemandExecutionTime", 0))
+    od_inst  = float(fd.get("onDemandInstances", 0))
+    od_gb_s  = od_inst * od_secs * mem_gb
 
     total += get_graduated_price(
         go.get("flex-consumption-on-demand-execution-payg", {}).get(region, {}).get("prices", []),
@@ -295,23 +295,25 @@ def _calc_flex(fd, data, region):
         od_execs)
 
     if fd.get("alwaysReadyEnabled"):
-        ar_inst      = float(fd.get("alwaysReadyInstances", 0))
-        ar_total_ex  = float(fd.get("alwaysReadyTotalExecutions", 0)) * 10
-        ar_base_secs = float(fd.get("alwaysReadyBaselineExecTime", 0))
-        ar_act_secs  = float(fd.get("alwaysReadyActiveExecTime", 0))
+        ar_inst        = float(fd.get("alwaysReadyInstances", 0))
+        ar_total_ex    = float(fd.get("alwaysReadyTotalExecutions", 0)) * 10
+        ar_base_secs   = float(fd.get("alwaysReadyBaselineExecTime", 0))
+        ar_act_secs    = float(fd.get("alwaysReadyActiveExecTime", 0))
+        ar_active_inst = float(fd.get("alwaysReadyActiveInstances", 0))  # ← add this
 
         total += get_graduated_price(
             go.get("flex-consumption-always-ready-baseline-payg", {}).get(region, {}).get("prices", []),
-            ar_inst * 730 * 3600 * mem_gb)
+            ar_inst * ar_base_secs * mem_gb)                             # ← fix: was 730 * 3600
+
         total += get_graduated_price(
             go.get("flex-consumption-always-ready-execution-payg", {}).get(region, {}).get("prices", []),
-            ar_act_secs * mem_gb * ar_total_ex)
+            ar_active_inst * ar_act_secs * mem_gb)                       # ← fix: was ar_total_ex
+
         total += get_graduated_price(
             go.get("flex-consumption-always-ready-total-execution-payg", {}).get(region, {}).get("prices", []),
             ar_total_ex)
 
     return round(total, 4)
-
 
 def _calc_premium(fd, data, region):
     instance   = fd.get("instance", "ep1")
